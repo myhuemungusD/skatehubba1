@@ -1,4 +1,7 @@
 packages:
-  - '.'
-  - 'mobile'
-  - 'infra/firebase/functions'
+  - '.'                      # The root itself
+  - 'server'                 # Your backend logic
+  - 'shared'                 # Shared types and schemas
+  - 'mobile'                 # Future mobile app
+  - 'infra/firebase/functions'  # Firebase Cloud Functions
+  - 'apps/*'                 # Any future sub-apps
