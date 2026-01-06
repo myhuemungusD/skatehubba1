@@ -3,7 +3,6 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "./.tsbuild",
-    "rootDir": ".",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
