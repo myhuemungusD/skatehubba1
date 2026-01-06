@@ -12,6 +12,11 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "dependencies": {
+    "drizzle-orm": "^0.34.0",
+    "drizzle-zod": "^0.6.0",
+    "zod": "^3.24.1"
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev -w server\" \"npm run dev -w client\"",
     "typecheck": "npm run typecheck -w client && npm run typecheck -w server",
@@ -21,6 +26,6 @@
   },
   "devDependencies": {
     "concurrently": "^8.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.9.3"
   }
 }
