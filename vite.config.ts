@@ -1,4 +1,3 @@
-
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from "path";
@@ -8,17 +7,16 @@ import { fileURLToPath } from "node:url";
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: true,          // bind to all interfaces
-    port: process.env.PORT || 3000,
-    allowedHosts: true   // accept any *.replit.app host
+    host: "0.0.0.0",
+    port: 3000,
+    allowedHosts: true,
+    hmr: {
+        port: 443 // Fixes potential Replit/Vercel WebSocket errors
+    }
   },
   root: "client",
-  preview: { 
-    host: "0.0.0.0", 
-    port: 3000 
-  },
   build: {
-    outDir: "../dist/public",
+    outDir: "dist", // <--- FIXED: Puts files right where Vercel wants them
     emptyOutDir: true,
     sourcemap: false
   },
