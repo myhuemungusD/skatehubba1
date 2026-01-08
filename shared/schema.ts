@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z, type ZodTypeAny } from "zod";
 
 export const NewSubscriberInput = z.object({
   firstName: z
