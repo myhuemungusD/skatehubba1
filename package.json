@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "concurrently \"pnpm --filter ./client dev\" \"pnpm --filter ./server dev\"",
     "build": "pnpm --filter ./shared build && pnpm --filter ./client build && pnpm --filter ./server build && pnpm run package:dist",
+    "build:ci": "pnpm install --frozen-lockfile && pnpm build",
     "package:dist": "node scripts/assemble-dist.mjs",
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
