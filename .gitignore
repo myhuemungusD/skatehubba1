@@ -37,6 +37,7 @@ attached_assets/
 !tsconfig.json
 !client/package.json
 !server/package.json
+!vercel.json
 
 # npm lock file (project uses pnpm)
 package-lock.json
