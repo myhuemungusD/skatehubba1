@@ -18,9 +18,6 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 
-// Trust proxy for rate limiting behind Google Cloud
-app.set("trust proxy", 1);
-
 // Rate limiting
 app.use("/api", apiLimiter);
 app.use("/api/spots", strictLimiter);
