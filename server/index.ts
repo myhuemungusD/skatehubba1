@@ -10,17 +10,12 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import logger from "./logger.ts";
 import { ensureCsrfToken } from "./middleware/csrf.ts";
-import { apiLimiter, strictLimiter } from "./middleware/rateLimit.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-
-// Rate limiting
-app.use("/api", apiLimiter);
-app.use("/api/spots", strictLimiter);
 
 // Security middleware
 if (process.env.NODE_ENV === "production") {
