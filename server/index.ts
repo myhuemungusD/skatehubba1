@@ -4,7 +4,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes.ts";
 import { setupVite, log } from "./vite.ts";
-import { env } from "./config/env.ts";
 import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
