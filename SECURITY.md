@@ -36,3 +36,11 @@ We explicitly accept the following residual risks to prioritize performance and 
 * **Distributed Store (Redis):** Trigger if legitimate traffic consistently exceeds single-instance memory limits or we see distributed spam attacks.
 * **WAF / Cloud Armor:** Trigger if we sustain a Layer 7 DDoS attack > 5 minutes.
 * **Strict CSP (Content Security Policy):** Deferred until Web client is fully stabilized to avoid breaking legitimate script loading during rapid feature dev.
+
+### 4. Hardening Phase Lock
+
+Once CodeQL alerts are resolved and baselined:
+
+- Re-run CodeQL and confirm no HIGH severity alerts.
+- Tag the release: `git tag -a v0.2.1-security-baseline -m "Security hardening baseline complete"`
+- Push the tag: `git push origin v0.2.1-security-baseline`
