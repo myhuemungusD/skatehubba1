@@ -67,4 +67,13 @@ updates:
         patterns: ["*"]
         update-types: ["patch", "minor"]
     ignore:
-      - depe
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions - Keep actions up-to-date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+
