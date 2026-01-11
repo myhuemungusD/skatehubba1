@@ -7,6 +7,7 @@ import { Toaster } from "./components/ui/toaster";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useToast } from "./hooks/use-toast";
 import { useAuth } from "./hooks/useAuth";
+import { AuthProvider } from "./context/AuthContext";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
 import { OrganizationStructuredData, WebAppStructuredData } from "./components/StructuredData";
@@ -208,43 +209,45 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <GoogleRedirectHandler />
-          <OrganizationStructuredData
-            data={{
-              name: "SkateHubba",
-              url: "https://skatehubba.com",
-              logo: "https://skatehubba.com/icon-512.png",
-              description: "Remote SKATE battles, legendary spot check-ins, and live lobbies. Join the ultimate skateboarding social platform.",
-              sameAs: [
-                "https://twitter.com/skatehubba_app",
-                "https://instagram.com/skatehubba",
-              ],
-            }}
-          />
-          <WebAppStructuredData
-            data={{
-              name: "SkateHubba",
-              url: "https://skatehubba.com",
-              description: "Stream. Connect. Skate. Your skateboarding social universe.",
-              applicationCategory: "SportsApplication",
-              operatingSystem: "Any",
-              offers: {
-                price: "0",
-                priceCurrency: "USD",
-              },
-            }}
-          />
-          <Router>
-            <AppRoutes />
-          </Router>
-          <Toaster />
-          <PWAInstallPrompt />
-          <AISkateChat />
-          <FeedbackButton />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <AuthProvider>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <GoogleRedirectHandler />
+            <OrganizationStructuredData
+              data={{
+                name: "SkateHubba",
+                url: "https://skatehubba.com",
+                logo: "https://skatehubba.com/icon-512.png",
+                description: "Remote SKATE battles, legendary spot check-ins, and live lobbies. Join the ultimate skateboarding social platform.",
+                sameAs: [
+                  "https://twitter.com/skatehubba_app",
+                  "https://instagram.com/skatehubba",
+                ],
+              }}
+            />
+            <WebAppStructuredData
+              data={{
+                name: "SkateHubba",
+                url: "https://skatehubba.com",
+                description: "Stream. Connect. Skate. Your skateboarding social universe.",
+                applicationCategory: "SportsApplication",
+                operatingSystem: "Any",
+                offers: {
+                  price: "0",
+                  priceCurrency: "USD",
+                },
+              }}
+            />
+            <Router>
+              <AppRoutes />
+            </Router>
+            <Toaster />
+            <PWAInstallPrompt />
+            <AISkateChat />
+            <FeedbackButton />
+          </TooltipProvider>
+        </QueryClientProvider>
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
