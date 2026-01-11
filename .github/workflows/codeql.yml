@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: ["main"]
   schedule:
-    - cron: "23 7 * * 1" # weekly (Mon 07:23 UTC)
+    - cron: "23 7 * * 1"
 
 permissions:
   contents: read
@@ -15,6 +15,7 @@ jobs:
   analyze:
     name: Analyze (CodeQL)
     runs-on: ubuntu-latest
+
     permissions:
       security-events: write
       contents: read
@@ -25,21 +26,10 @@ jobs:
         language: ["javascript-typescript"]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node 20
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "pnpm"
-
-      - name: Setup pnpm (via Corepack)
-        shell: bash
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.0.0 --activate
-          pnpm -v
+      # ✅ SINGLE SOURCE OF TRUTH
+      - uses: ./.github/actions/setup-pnpm-env
 
       - name: Install dependencies (workspace)
         run: pnpm install --frozen-lockfile
@@ -49,8 +39,6 @@ jobs:
         with:
           languages: ${{ matrix.language }}
 
-      # For JS/TS, CodeQL can analyze without a build,
-      # but building improves results and catches more issues.
       - name: Build (best-effort)
         shell: bash
         run: |
