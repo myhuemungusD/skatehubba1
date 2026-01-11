@@ -48,6 +48,8 @@ export interface AuthContextValue extends AuthState {
   signUp: (email: string, password: string) => Promise<void>;
   /** Sign in with email and password */
   signIn: (email: string, password: string) => Promise<void>;
+  /** Sign in with Google */
+  signInWithGoogle: () => Promise<void>;
   /** Sign out the current user */
   signOut: () => Promise<void>;
   /** Whether user is authenticated (has verified email or provider auth) */

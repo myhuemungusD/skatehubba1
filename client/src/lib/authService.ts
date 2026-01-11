@@ -8,6 +8,10 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   User,
   Unsubscribe
 } from 'firebase/auth';
@@ -58,7 +62,11 @@ function mapAuthError(error: unknown): AuthError {
     'auth/wrong-password': 'Incorrect password.',
     'auth/too-many-requests': 'Too many attempts. Please try again later.',
     'auth/network-request-failed': 'Network error. Please check your connection.',
-    'auth/invalid-credential': 'Invalid email or password.'
+    'auth/invalid-credential': 'Invalid email or password.',
+    'auth/popup-closed-by-user': 'Sign-in was cancelled.',
+    'auth/cancelled-popup-request': 'Sign-in was cancelled.',
+    'auth/popup-blocked': 'Pop-up was blocked. Please allow pop-ups and try again.',
+    'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method.'
   };
   
   return {
@@ -178,6 +186,102 @@ export async function signInWithEmail(
     // If profile doesn't exist (edge case), create one
     if (!userProfile) {
       userProfile = await createUserProfile(firebaseUser.uid, email);
+    }
+    
+    return { firebaseUser, userProfile };
+  } catch (error) {
+    const authError = mapAuthError(error);
+    throw new Error(authError.message);
+  }
+}
+
+/**
+ * Sign in with Google
+ * Creates Firestore profile if it doesn't exist
+ */
+export async function signInWithGoogle(): Promise<{ firebaseUser: FirebaseUserData; userProfile: UserProfile }> {
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    
+    // Check if mobile - use redirect for better UX
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    let userCredential;
+    
+    if (isMobile) {
+      // For mobile, use redirect flow
+      await signInWithRedirect(auth, provider);
+      // This will redirect away, so we return a placeholder
+      // The actual result is handled by handleGoogleRedirect
+      return { 
+        firebaseUser: { uid: '', email: null, displayName: null, photoURL: null, emailVerified: false },
+        userProfile: { uid: '', email: '', displayName: '', photoURL: null, createdAt: new Date(), updatedAt: new Date() }
+      };
+    } else {
+      // For desktop, try popup first
+      try {
+        userCredential = await signInWithPopup(auth, provider);
+      } catch (popupError: unknown) {
+        const error = popupError as { code?: string };
+        // If popup blocked, fall back to redirect
+        if (error.code === 'auth/popup-blocked') {
+          await signInWithRedirect(auth, provider);
+          return { 
+            firebaseUser: { uid: '', email: null, displayName: null, photoURL: null, emailVerified: false },
+            userProfile: { uid: '', email: '', displayName: '', photoURL: null, createdAt: new Date(), updatedAt: new Date() }
+          };
+        }
+        throw popupError;
+      }
+    }
+    
+    const firebaseUser = toFirebaseUserData(userCredential.user);
+    
+    // Fetch or create profile
+    let userProfile = await fetchUserProfile(firebaseUser.uid);
+    
+    if (!userProfile) {
+      userProfile = await createUserProfile(
+        firebaseUser.uid,
+        firebaseUser.email ?? '',
+        firebaseUser.displayName ?? undefined
+      );
+    }
+    
+    return { firebaseUser, userProfile };
+  } catch (error) {
+    const authError = mapAuthError(error);
+    throw new Error(authError.message);
+  }
+}
+
+/**
+ * Handle Google redirect result (for mobile or popup-blocked scenarios)
+ */
+export async function handleGoogleRedirectResult(): Promise<{ firebaseUser: FirebaseUserData; userProfile: UserProfile } | null> {
+  try {
+    if (isMockMode()) {
+      return null;
+    }
+    
+    const result = await getRedirectResult(auth);
+    
+    if (!result) {
+      return null;
+    }
+    
+    const firebaseUser = toFirebaseUserData(result.user);
+    
+    // Fetch or create profile
+    let userProfile = await fetchUserProfile(firebaseUser.uid);
+    
+    if (!userProfile) {
+      userProfile = await createUserProfile(
+        firebaseUser.uid,
+        firebaseUser.email ?? '',
+        firebaseUser.displayName ?? undefined
+      );
     }
     
     return { firebaseUser, userProfile };

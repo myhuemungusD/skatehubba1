@@ -6,13 +6,14 @@ import { useToast } from "../hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Link, useLocation } from "wouter";
 import { Mail, Lock } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 
 export default function SigninPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { signIn } = useAuthContext();
+  const { signIn, signInWithGoogle } = useAuthContext();
   const [, setLocation] = useLocation();
 
   async function handleLogin(e: React.FormEvent) {
@@ -30,6 +31,28 @@ export default function SigninPage() {
       const errorMessage = err instanceof Error ? err.message : "Login failed";
       toast({ 
         title: "Login failed", 
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setIsLoading(true);
+    
+    try {
+      await signInWithGoogle();
+      toast({ 
+        title: "Welcome! 🛹",
+        description: "You've successfully signed in with Google."
+      });
+      setLocation("/map");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Google sign-in failed";
+      toast({ 
+        title: "Google sign-in failed", 
         description: errorMessage,
         variant: "destructive"
       });
@@ -97,6 +120,23 @@ export default function SigninPage() {
                 {isLoading ? "Signing In..." : "Sign In"}
               </Button>
             </form>
+
+            <div className="flex items-center my-6">
+              <div className="flex-grow border-t border-gray-600"></div>
+              <span className="mx-3 text-gray-400 text-sm">or</span>
+              <div className="flex-grow border-t border-gray-600"></div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+              className="w-full bg-white hover:bg-gray-100 text-black font-semibold flex items-center justify-center gap-2"
+              data-testid="button-signin-google"
+            >
+              <SiGoogle className="w-5 h-5" />
+              Sign in with Google
+            </Button>
 
             <div className="mt-6 text-center">
               <p className="text-gray-400">

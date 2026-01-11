@@ -6,13 +6,14 @@ import { useToast } from "../hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Link, useLocation } from "wouter";
 import { Mail, Lock } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { signUp } = useAuthContext();
+  const { signUp, signInWithGoogle } = useAuthContext();
   const [, setLocation] = useLocation();
 
   async function handleSignup(e: React.FormEvent) {
@@ -30,6 +31,28 @@ export default function SignupPage() {
       const errorMessage = err instanceof Error ? err.message : "Registration failed";
       toast({ 
         title: "Registration Failed", 
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleGoogleSignUp() {
+    setIsLoading(true);
+    
+    try {
+      await signInWithGoogle();
+      toast({ 
+        title: "Account Created! 🛹", 
+        description: "Welcome to SkateHubba!" 
+      });
+      setLocation("/map");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Google sign-up failed";
+      toast({ 
+        title: "Google sign-up failed", 
         description: errorMessage,
         variant: "destructive"
       });
@@ -98,6 +121,23 @@ export default function SignupPage() {
                 {isLoading ? "Creating Account..." : "Sign Up"}
               </Button>
             </form>
+
+            <div className="flex items-center my-6">
+              <div className="flex-grow border-t border-gray-600"></div>
+              <span className="mx-3 text-gray-400 text-sm">or</span>
+              <div className="flex-grow border-t border-gray-600"></div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleGoogleSignUp}
+              disabled={isLoading}
+              className="w-full bg-white hover:bg-gray-100 text-black font-semibold flex items-center justify-center gap-2"
+              data-testid="button-signup-google"
+            >
+              <SiGoogle className="w-5 h-5" />
+              Sign up with Google
+            </Button>
 
             <div className="mt-6 text-center">
               <p className="text-gray-400">

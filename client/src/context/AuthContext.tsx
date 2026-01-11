@@ -19,6 +19,8 @@ import {
 import {
   signUpWithEmail,
   signInWithEmail,
+  signInWithGoogle as signInWithGoogleService,
+  handleGoogleRedirectResult,
   signOutUser,
   subscribeToAuthState,
   fetchUserProfile,
@@ -43,6 +45,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Subscribe to Firebase auth state changes on mount
   useEffect(() => {
+    // Check for Google redirect result first
+    handleGoogleRedirectResult()
+      .then((result) => {
+        if (result) {
+          setState({
+            firebaseUser: result.firebaseUser,
+            userProfile: result.userProfile,
+            isLoading: false,
+            error: null
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('[AuthProvider] Google redirect error:', error);
+      });
+
     const unsubscribe = subscribeToAuthState(async (firebaseUser: User | null) => {
       if (firebaseUser) {
         try {
@@ -123,6 +141,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  const signInWithGoogle = useCallback(async (): Promise<void> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const { firebaseUser, userProfile } = await signInWithGoogleService();
+      
+      // If uid is empty, it means redirect was triggered (mobile/popup blocked)
+      if (firebaseUser.uid) {
+        setState({
+          firebaseUser,
+          userProfile,
+          isLoading: false,
+          error: null
+        });
+      }
+      // Otherwise, state will be updated by the redirect handler
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Google sign in failed';
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: errorMessage
+      }));
+      throw error;
+    }
+  }, []);
+
   const signOut = useCallback(async (): Promise<void> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
     
@@ -153,6 +198,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     ...state,
     signUp,
     signIn,
+    signInWithGoogle,
     signOut,
     isAuthenticated
   };
