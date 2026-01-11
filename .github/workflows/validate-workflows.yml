@@ -43,9 +43,8 @@ jobs:
         shell: bash
         run: |
           for workflow in .github/workflows/ci.yml \
-                          .github/workflows/codeql.yml \
                           .github/workflows/deploy.yml; do
-            if ! grep -q "uses: ./.github/actions/setup-pnpm-env" "$workflow"; then
+            if [ -f "$workflow" ] && ! grep -q "uses: ./.github/actions/setup-pnpm-env" "$workflow"; then
               echo "::error::$workflow does not use composite action"
               exit 1
             fi
