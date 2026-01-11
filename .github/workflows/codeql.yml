@@ -29,13 +29,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      # ✅ REQUIRED: composite pnpm setup (NO manual corepack)
-      - name: Setup pnpm
+      # ✅ REQUIRED: composite pnpm setup (handles Node.js + pnpm)
+      - name: Setup pnpm environment
         uses: ./.github/actions/setup-pnpm-env
 
       # ✅ CodeQL must be initialized BEFORE install/build
