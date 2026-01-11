@@ -36,11 +36,14 @@ jobs:
       - name: Validate workflows use composite action
         shell: bash
         run: |
-          for workflow in .github/workflows/ci.yml .github/workflows/codeql.yml .github/workflows/deploy.yml; do
+          # Find all workflows that use pnpm and ensure they use the standardized setup action
+          pnpm_workflows=$(grep -rl "pnpm " .github/workflows/*.yml || true)
+
+          for workflow in $pnpm_workflows; do
             if ! grep -q "uses: ./.github/actions/setup-pnpm-env" "$workflow"; then
               echo "::error::$workflow does not use composite action"
               exit 1
             fi
           done
 
-          echo "✅ All workflows use standardized setup"
+          echo "✅ All pnpm workflows use standardized setup"
