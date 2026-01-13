@@ -49,27 +49,10 @@ jobs:
         env: 
           FIREBASE_CLI_PREVIEWS: hostingchannels
 
-  # Vercel typically builds from source, so we keep the checkout step.
-  # If you want Vercel to use the pre-built artifacts, you would need to adjust 
-  # the Vercel project settings to "Override Build Command" to empty.
-  deploy_vercel:
-    needs: [build_and_test]
-    name: "Deploy: Vercel"
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      - uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          vercel-args: '--prod'
-          # Ensure Vercel knows to look in the 'client' directory if that's how your project is set up
-          working-directory: ./client
-
+  # Vercel will auto-deploy via GitHub integration when vercel.json is configured
+  # The push to the repository triggers the Vercel deployment automatically
   verify_production:
-    needs: [deploy_firebase, deploy_vercel]
+    needs: [deploy_firebase]
     runs-on: ubuntu-latest
     steps:
       - run: |
