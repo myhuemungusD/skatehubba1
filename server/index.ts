@@ -69,8 +69,8 @@ app.use(ensureCsrfToken);
 // Global rate limiting for all API routes
 app.use('/api', apiLimiter);
 
-// Global CSRF validation for all mutating API requests
-app.use('/api', requireCsrfToken);
+// Global CSRF validation for all mutating requests
+app.use(requireCsrfToken);
 
 // Register all API routes
 await registerRoutes(app);
