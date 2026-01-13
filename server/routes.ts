@@ -14,6 +14,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupAuthRoutes(app);
 
   // 2. Spot Endpoints
+  // IMPORTANT: Specific routes MUST come before parameterized routes
+
+  // GET /api/spots/stats - Get spot statistics (specific route first)
+  app.get("/api/spots/stats", async (_req, res) => {
+    try {
+      const stats = await spotStorage.getStats();
+      res.json(stats);
+    } catch (error) {
+      logger.error('Failed to fetch spot stats', { error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ message: 'Failed to fetch stats' });
+    }
+  });
+
+  // GET /api/spots/user/me - Get current user's spots (specific route first)
+  app.get("/api/spots/user/me", authenticateUser, async (req, res) => {
+    try {
+      if (!req.currentUser) {
+        return res.status(401).json({ message: "You must be logged in" });
+      }
+
+      const spots = await spotStorage.getSpotsByUser(req.currentUser.id);
+      res.json(spots);
+    } catch (error) {
+      logger.error('Failed to fetch user spots', { error: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({ message: 'Failed to fetch your spots' });
+    }
+  });
 
   // GET /api/spots - Get all spots (with optional filters)
   app.get("/api/spots", async (req, res) => {
@@ -45,7 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/spots/:id - Get a single spot
+  // GET /api/spots/:id - Get a single spot (parameterized route AFTER specific routes)
   app.get("/api/spots/:id", async (req, res) => {
     try {
       const spotId = parseInt(req.params.id);
@@ -213,32 +240,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       logger.error('Failed to rate spot', { error: error instanceof Error ? error.message : String(error) });
       res.status(500).json({ message: 'Failed to rate spot' });
-    }
-  });
-
-  // GET /api/spots/user/me - Get current user's spots
-  app.get("/api/spots/user/me", authenticateUser, async (req, res) => {
-    try {
-      if (!req.currentUser) {
-        return res.status(401).json({ message: "You must be logged in" });
-      }
-
-      const spots = await spotStorage.getSpotsByUser(req.currentUser.id);
-      res.json(spots);
-    } catch (error) {
-      logger.error('Failed to fetch user spots', { error: error instanceof Error ? error.message : String(error) });
-      res.status(500).json({ message: 'Failed to fetch your spots' });
-    }
-  });
-
-  // GET /api/spots/stats - Get spot statistics
-  app.get("/api/spots/stats", async (_req, res) => {
-    try {
-      const stats = await spotStorage.getStats();
-      res.json(stats);
-    } catch (error) {
-      logger.error('Failed to fetch spot stats', { error: error instanceof Error ? error.message : String(error) });
-      res.status(500).json({ message: 'Failed to fetch stats' });
     }
   });
 
