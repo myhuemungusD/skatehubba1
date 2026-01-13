@@ -1,13 +1,19 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from "path";
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tsconfigPaths from "vite-tsconfig-paths";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    tsconfigPaths({
+      projects: [path.resolve(__dirname, "client/tsconfig.json")],
+    }),
+  ],
   envDir: __dirname,
   server: {
     host: "0.0.0.0",
@@ -16,15 +22,9 @@ export default defineConfig({
   },
   root: "client",
   build: {
-    outDir: "dist", // <--- FIXED: Puts files right where Vercel wants them
+    outDir: "../dist/public",
     emptyOutDir: true,
-    sourcemap: false
+    sourcemap: false,
   },
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./client/src"),
-      "@shared": path.resolve(__dirname, "./shared")
-    }
-  },
-  publicDir: "public"
+  publicDir: "public",
 });

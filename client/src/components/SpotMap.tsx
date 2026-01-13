@@ -55,9 +55,9 @@ export const SpotMap = memo(function SpotMap({ spots, userLocation, selectedSpot
   const icons = useMemo(() => {
     const createIcon = (colorClass: string) => L.divIcon({
       html: `
-        <div class="relative">
+        <div class="relative" role="img" aria-label="Skate spot marker">
           <div class="w-8 h-8 rounded-full ${colorClass} flex items-center justify-center shadow-lg">
-            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
@@ -172,8 +172,8 @@ export const SpotMap = memo(function SpotMap({ spots, userLocation, selectedSpot
       const needsIconUpdate = currentProximity !== proximityKey;
 
       if (!marker) {
-        // Create new marker
-        marker = L.marker([spot.lat, spot.lng], { icon })
+        // Create new marker with title for accessibility (tooltip + screen reader)
+        marker = L.marker([spot.lat, spot.lng], { icon, title: spot.name })
           .addTo(map)
           .on('click', () => onSelectSpot(spot.id));
         

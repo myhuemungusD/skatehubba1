@@ -25,7 +25,7 @@ if (process.env.NODE_ENV === 'production') {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https:", "blob:"],
         connectSrc: ["'self'", "https:"],
@@ -56,16 +56,23 @@ app.use(cors(corsOptions));
 // Compression
 app.use(compression());
 
-// Body parsing
+// Body parsing (before CSRF to enable JSON/form requests)
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Cookie parsing - MUST come before CSRF token creation
 app.use(cookieParser());
+
+// CSRF protection (double-submit cookie pattern) - MUST come after cookieParser
+// 1. ensureCsrfToken: Sets CSRF token in httpOnly=false cookie for all requests
+// 2. requireCsrfToken: Validates X-CSRF-Token header matches cookie on state-changing requests
+// This prevents attackers from reading the cookie cross-origin due to Same-Origin Policy
 app.use(ensureCsrfToken);
 
-// Global rate limiting for all API routes
+// Global rate limiting for all API routes (before CSRF validation for better error handling)
 app.use('/api', apiLimiter);
 
-// Global CSRF validation for all mutating API requests
+// Global CSRF validation for all state-changing API requests
 app.use('/api', requireCsrfToken);
 
 // Register all API routes
