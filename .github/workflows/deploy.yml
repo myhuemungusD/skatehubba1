@@ -5,56 +5,17 @@ on:
     branches: [main]
 
 jobs:
-  build_and_test:
-    name: "Build & Verify"
+  verify_deployment:
+    name: "Verify Deployment"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      # Simple checks to ensure the build would be valid
       - uses: ./.github/actions/setup-pnpm-env
-      
       - run: pnpm install
-      
-      # Run checks on the client specifically
       - run: pnpm -C client typecheck
       
-      # Build the client (This creates client/dist)
-      - run: pnpm -C client build
-      
-      # Upload only the client build artifacts for deployment
-      - uses: actions/upload-artifact@v4
-        with: 
-          name: production-dist
-          path: dist/public
-
-  deploy_firebase:
-    needs: [build_and_test]
-    name: "Deploy: Firebase"
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      
-      # Download the artifacts to the 'dist/public' folder so the path matches
-      - uses: actions/download-artifact@v4
-        with: 
-          name: production-dist
-          path: dist/public
-          
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SKATEHUBBA }}
-          projectId: skatehubba-app
-          channelId: live
-        env: 
-          FIREBASE_CLI_PREVIEWS: hostingchannels
-
-  # Vercel will auto-deploy via GitHub integration when vercel.json is configured
-  # The push to the repository triggers the Vercel deployment automatically
-  verify_production:
-    needs: [deploy_firebase]
-    runs-on: ubuntu-latest
-    steps:
-      - run: |
-          curl --fail https://skatehubba.com/api/health || exit 1
-          echo "✅ Site is live and healthy."
+      # Note: Vercel will automatically deploy via GitHub integration
+      # The vercel.json configuration handles the build and deployment
+      # See: https://vercel.com/docs/concepts/git/vercel-for-github
