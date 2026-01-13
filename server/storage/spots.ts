@@ -1,6 +1,6 @@
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, sql, getTableColumns } from 'drizzle-orm';
 import { db } from '../db';
-import { spots, type Spot, type InsertSpot } from '@shared/schema';
+import { spots, customUsers, type Spot, type InsertSpot } from '@shared/schema';
 import logger from '../logger';
 
 export interface SpotFilters {
@@ -13,18 +13,35 @@ export interface SpotFilters {
   offset?: number;
 }
 
+export type SpotWithCreator = Spot & { 
+  creatorName: string | null;
+  creatorFirstName?: string | null;
+  creatorLastName?: string | null;
+};
+
 export class SpotStorage {
   /**
    * Create a new spot
    */
-  async createSpot(data: InsertSpot & { createdBy?: string }): Promise<Spot> {
+  async createSpot(data: InsertSpot & { createdBy?: string | null }): Promise<Spot> {
     if (!db) {
       throw new Error('Database not available');
     }
 
     const [spot] = await db.insert(spots).values({
-      ...data,
-      createdBy: data.createdBy || null,
+      name: data.name,
+      description: data.description ?? null,
+      spotType: data.spotType ?? 'street',
+      tier: data.tier ?? 'bronze',
+      lat: data.lat,
+      lng: data.lng,
+      address: data.address ?? null,
+      city: data.city ?? null,
+      state: data.state ?? null,
+      country: data.country ?? 'USA',
+      photoUrl: data.photoUrl,
+      thumbnailUrl: null,
+      createdBy: data.createdBy ?? null,
       verified: false,
       isActive: true,
       checkInCount: 0,
@@ -39,7 +56,7 @@ export class SpotStorage {
   /**
    * Get all spots with optional filters
    */
-  async getAllSpots(filters: SpotFilters = {}): Promise<Spot[]> {
+  async getAllSpots(filters: SpotFilters = {}): Promise<SpotWithCreator[]> {
     if (!db) {
       logger.warn('Database not available, returning empty spots');
       return [];
@@ -63,7 +80,11 @@ export class SpotStorage {
       conditions.push(eq(spots.verified, filters.verified));
     }
 
-    let query = db.select().from(spots).where(and(...conditions)).orderBy(desc(spots.createdAt));
+    let query = db.select({
+      ...getTableColumns(spots),
+      creatorFirstName: customUsers.firstName,
+      creatorLastName: customUsers.lastName,
+    }).from(spots).leftJoin(customUsers, eq(spots.createdBy, customUsers.id)).where(and(...conditions)).orderBy(desc(spots.createdAt));
 
     if (filters.limit) {
       query = query.limit(filters.limit);
@@ -72,22 +93,34 @@ export class SpotStorage {
       query = query.offset(filters.offset);
     }
 
-    return await query;
+    const results = await query;
+    return results.map(row => ({
+      ...row,
+      creatorName: row.creatorFirstName ? `${row.creatorFirstName} ${row.creatorLastName || ''}`.trim() : 'Anonymous',
+    }));
   }
 
   /**
    * Get a single spot by ID
    */
-  async getSpotById(id: number): Promise<Spot | null> {
+  async getSpotById(id: number): Promise<SpotWithCreator | null> {
     if (!db) {
       return null;
     }
 
-    const [spot] = await db.select().from(spots).where(
+    const [spot] = await db.select({
+      ...getTableColumns(spots),
+      creatorFirstName: customUsers.firstName,
+      creatorLastName: customUsers.lastName,
+    }).from(spots).leftJoin(customUsers, eq(spots.createdBy, customUsers.id)).where(
       and(eq(spots.id, id), eq(spots.isActive, true))
     ).limit(1);
 
-    return spot || null;
+    if (!spot) return null;
+    return {
+      ...spot,
+      creatorName: spot.creatorFirstName ? `${spot.creatorFirstName} ${spot.creatorLastName || ''}`.trim() : 'Anonymous',
+    };
   }
 
   /**
@@ -98,7 +131,7 @@ export class SpotStorage {
     lng: number,
     radiusKm: number = 50,
     limit: number = 100
-  ): Promise<Spot[]> {
+  ): Promise<SpotWithCreator[]> {
     if (!db) {
       return [];
     }
@@ -109,13 +142,22 @@ export class SpotStorage {
     const latDelta = radiusKm / 111;
     const lngDelta = radiusKm / (111 * Math.cos(lat * Math.PI / 180));
 
-    return await db.select().from(spots).where(
+    const results = await db.select({
+      ...getTableColumns(spots),
+      creatorFirstName: customUsers.firstName,
+      creatorLastName: customUsers.lastName,
+    }).from(spots).leftJoin(customUsers, eq(spots.createdBy, customUsers.id)).where(
       and(
         eq(spots.isActive, true),
         sql`${spots.lat} BETWEEN ${lat - latDelta} AND ${lat + latDelta}`,
         sql`${spots.lng} BETWEEN ${lng - lngDelta} AND ${lng + lngDelta}`
       )
     ).orderBy(desc(spots.createdAt)).limit(limit);
+
+    return results.map(row => ({
+      ...row,
+      creatorName: row.creatorFirstName ? `${row.creatorFirstName} ${row.creatorLastName || ''}`.trim() : 'Anonymous',
+    }));
   }
 
   /**
@@ -224,14 +266,23 @@ export class SpotStorage {
   /**
    * Get spots created by a user
    */
-  async getSpotsByUser(userId: string): Promise<Spot[]> {
+  async getSpotsByUser(userId: string): Promise<SpotWithCreator[]> {
     if (!db) {
       return [];
     }
 
-    return await db.select().from(spots).where(
+    const results = await db.select({
+      ...getTableColumns(spots),
+      creatorFirstName: customUsers.firstName,
+      creatorLastName: customUsers.lastName,
+    }).from(spots).leftJoin(customUsers, eq(spots.createdBy, customUsers.id)).where(
       and(eq(spots.createdBy, userId), eq(spots.isActive, true))
     ).orderBy(desc(spots.createdAt));
+
+    return results.map(row => ({
+      ...row,
+      creatorName: row.creatorFirstName ? `${row.creatorFirstName} ${row.creatorLastName || ''}`.trim() : 'Anonymous',
+    }));
   }
 
   /**

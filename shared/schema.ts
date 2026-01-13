@@ -300,7 +300,7 @@ export const insertSpotSchema = createInsertSchema(spots, {
   city: z.string().trim().max(100).optional(),
   state: z.string().trim().max(50).optional(),
   country: z.string().trim().max(100).optional(),
-  photoUrl: z.string().url().optional(),
+  photoUrl: z.string().url("Valid image URL required").min(1, "Spot image is required"),
 }).omit({
   id: true,
   createdAt: true,
@@ -311,6 +311,7 @@ export const insertSpotSchema = createInsertSchema(spots, {
   rating: true,
   ratingCount: true,
   thumbnailUrl: true,
+  createdBy: true,
 });
 
 // S.K.A.T.E. Games table
