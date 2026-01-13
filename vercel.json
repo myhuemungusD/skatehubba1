@@ -1,8 +1,8 @@
 {
   "version": 2,
   "framework": "vite",
-  "buildCommand": "cd client && pnpm install && pnpm run build",
-  "outputDirectory": "client/dist/public",
+  "buildCommand": "pnpm install && pnpm run build",
+  "outputDirectory": "dist/public",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
