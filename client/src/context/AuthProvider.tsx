@@ -31,6 +31,7 @@ import {
   signUpWithEmail,
   signInWithEmail,
   signInWithGoogle,
+  signInAnonymously,
   getGoogleRedirectResult,
   signOutUser,
   onAuthStateChange,
@@ -184,6 +185,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  // Sign in anonymously (guest)
+  const handleSignInAnonymously = useCallback(async (): Promise<void> => {
+    setError(null);
+    setIsLoading(true);
+    
+    try {
+      const authUser = await signInAnonymously();
+      setUser(authUser);
+      // Anonymous users don't need a profile in Firestore
+      setProfile(null);
+    } catch (err) {
+      const authError = err as AuthError;
+      setError(authError.message);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Sign out
   const handleSignOut = useCallback(async (): Promise<void> => {
     setError(null);
@@ -227,6 +247,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signUp: handleSignUp,
     signIn: handleSignIn,
     signInWithGoogle: handleSignInWithGoogle,
+    signInAnonymously: handleSignInAnonymously,
     signOut: handleSignOut,
     resetPassword: handleResetPassword,
     clearError,
@@ -238,6 +259,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     handleSignUp,
     handleSignIn,
     handleSignInWithGoogle,
+    handleSignInAnonymously,
     handleSignOut,
     handleResetPassword,
     clearError,

@@ -14,9 +14,9 @@ import {
   Auth 
 } from 'firebase/auth';
 import { 
-  getFirestore, 
+  getFirestore,
   connectFirestoreEmulator,
-  Firestore 
+  Firestore,
 } from 'firebase/firestore';
 
 // ============================================================================
