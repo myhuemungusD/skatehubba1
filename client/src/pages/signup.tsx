@@ -21,7 +21,7 @@ export default function SignupPage() {
     setIsLoading(true);
     
     try {
-      await auth?.signUp(email, password);
+      await auth?.signUpWithEmail(email, password);
       toast({ 
         title: "Account Created! 🛹", 
         description: "Welcome to SkateHubba!" 

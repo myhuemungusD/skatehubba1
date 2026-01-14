@@ -21,7 +21,7 @@ export default function SigninPage() {
     setIsLoading(true);
     
     try {
-      await auth?.signIn(email, password);
+      await auth?.signInWithEmail(email, password);
       toast({ 
         title: "Welcome back! 🛹",
         description: "You've successfully signed in."
