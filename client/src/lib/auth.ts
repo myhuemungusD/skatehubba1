@@ -197,12 +197,16 @@ export async function loginWithGoogle(forceRedirect = false) {
     // Use redirect flow (better for mobile)
     console.log('[Google Auth] Using redirect flow for mobile/forced redirect');
     try {
+      // Set flag so we know to show welcome toast when returning from redirect
+      sessionStorage.setItem('googleRedirectPending', 'true');
       await signInWithRedirect(auth, provider);
     } catch (redirectError: any) {
+      // Clear flag on error
+      sessionStorage.removeItem('googleRedirectPending');
       console.error('[Google Auth] Redirect initiation failed:', redirectError);
       throw new Error(`Failed to start Google Sign-In: ${redirectError?.message || 'Unknown error'}`);
     }
-    // Note: User will be redirected away, control returns via handleGoogleRedirect()
+    // Note: User will be redirected away, control returns via handleGoogleRedirectResult() in AuthContext
     return null;
   }
 

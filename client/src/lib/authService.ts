@@ -286,20 +286,62 @@ export async function signInWithGoogle(): Promise<{ firebaseUser: FirebaseUserDa
 
 /**
  * Handle Google redirect result (for mobile or popup-blocked scenarios)
+ * This is called on app initialization to complete redirect-based sign-in
  */
 export async function handleGoogleRedirectResult(): Promise<{ firebaseUser: FirebaseUserData; userProfile: UserProfile } | null> {
+  console.log('[AuthService] handleGoogleRedirectResult called');
+  
   try {
     if (isMockMode()) {
+      console.log('[AuthService] Mock mode, skipping redirect check');
       return null;
     }
     
     const result = await getRedirectResult(auth);
     
     if (!result) {
+      console.log('[AuthService] No redirect result (normal page load)');
       return null;
     }
     
-    const firebaseUser = toFirebaseUserData(result.user);
+    console.log('[AuthService] Redirect result found, user:', result.user?.uid);
+    
+    // CRITICAL: Authenticate with backend to create session cookie
+    // Without this, the user won't stay logged in after navigation
+    const rawUser = result.user;
+    const idToken = await rawUser.getIdToken();
+    
+    console.log('[AuthService] Authenticating with backend...');
+    
+    // Extract name from Google profile
+    const displayName = rawUser.displayName || '';
+    const nameParts = displayName.trim().split(/\s+/);
+    const firstName = nameParts[0] || undefined;
+    const lastName = nameParts.slice(1).join(' ') || undefined;
+    
+    const payload: Record<string, unknown> = {};
+    if (firstName) payload.firstName = firstName;
+    if (lastName) payload.lastName = lastName;
+    
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload),
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[AuthService] Backend auth failed:', errorData);
+      throw new Error(errorData.message || 'Backend authentication failed');
+    }
+    
+    console.log('[AuthService] Backend auth successful');
+    
+    const firebaseUser = toFirebaseUserData(rawUser);
     
     // Fetch or create profile
     let userProfile = await fetchUserProfile(firebaseUser.uid);
@@ -312,8 +354,10 @@ export async function handleGoogleRedirectResult(): Promise<{ firebaseUser: Fire
       );
     }
     
+    console.log('[AuthService] Google redirect login complete');
     return { firebaseUser, userProfile };
   } catch (error) {
+    console.error('[AuthService] handleGoogleRedirectResult error:', error);
     const authError = mapAuthError(error);
     throw new Error(authError.message);
   }
