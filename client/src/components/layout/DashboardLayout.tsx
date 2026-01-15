@@ -18,14 +18,45 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [location] = useLocation();
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white flex flex-col">
-      <main className="flex-1 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom)+1rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <div className="mx-auto w-full max-w-md px-4 pt-4">
+    <div className="min-h-screen bg-neutral-950 text-white flex flex-col md:flex-row">
+      {/* Side nav - desktop only (hidden on mobile) */}
+      <nav
+        className="hidden md:flex fixed left-0 top-0 bottom-0 w-20 border-r border-neutral-800 bg-neutral-950/95 flex-col items-center py-6 gap-2 z-50"
+        role="navigation"
+        aria-label="Dashboard navigation"
+      >
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location === item.href;
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex flex-col items-center justify-center gap-1 rounded-lg px-3 py-3 text-xs font-medium transition-colors w-16 ${
+                isActive
+                  ? "text-yellow-400 bg-neutral-800"
+                  : "text-neutral-400 hover:text-white hover:bg-neutral-800/50"
+              }`}
+              aria-current={isActive ? "page" : undefined}
+            >
+              <Icon className="h-5 w-5" aria-hidden="true" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* Main content - responsive width, offset for side nav on desktop */}
+      <main className="flex-1 overflow-y-auto pb-20 md:pb-4 md:ml-20 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="mx-auto w-full max-w-md md:max-w-4xl lg:max-w-6xl xl:max-w-7xl px-4 pt-4">
           {children}
         </div>
       </main>
+
+      {/* Bottom nav - mobile only (hidden on desktop) */}
       <nav
-        className="fixed bottom-0 left-0 right-0 border-t border-neutral-800 bg-neutral-950/95 pb-[env(safe-area-inset-bottom)]"
+        className="md:hidden fixed bottom-0 left-0 right-0 border-t border-neutral-800 bg-neutral-950/95 pb-[env(safe-area-inset-bottom)] z-50"
         role="navigation"
         aria-label="Dashboard navigation"
       >
