@@ -94,23 +94,26 @@ export async function verifyAndCheckIn(
   }
 
   try {
-    const [checkIn] = await db
-      .insert(checkIns)
-      .values({
-        userId,
-        spotId,
-        timestamp: new Date(),
-      })
-      .returning({ id: checkIns.id });
+    const checkIn = await db.transaction(async (tx) => {
+      const [createdCheckIn] = await tx
+        .insert(checkIns)
+        .values({
+          userId,
+          spotId,
+          timestamp: new Date(),
+        })
+        .returning({ id: checkIns.id });
 
-    await db
-      .update(spots)
-      .set({
-        checkInCount: sql`${spots.checkInCount} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(spots.id, spotId));
+      await tx
+        .update(spots)
+        .set({
+          checkInCount: sql`${spots.checkInCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(spots.id, spotId));
 
+      return createdCheckIn;
+    });
     return { success: true, checkInId: checkIn.id };
   } catch (error) {
     if (isPgError(error) && error.code === "23505") {
