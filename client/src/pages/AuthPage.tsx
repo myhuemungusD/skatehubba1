@@ -7,12 +7,12 @@
  * @module pages/auth
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useLocation } from 'wouter';
-import { Eye, EyeOff, Mail, User, Lock, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, User, Lock, Loader2, ExternalLink } from 'lucide-react';
 import { SiGoogle } from 'react-icons/si';
 
 import { Button } from '../components/ui/button';
@@ -24,6 +24,25 @@ import { Checkbox } from '../components/ui/checkbox';
 import { useToast } from '../hooks/use-toast';
 import { useAuth } from '../context/AuthProvider';
 import { setAuthPersistence } from '../lib/firebase';
+
+/**
+ * Detect if running in an embedded browser (Instagram, Facebook, etc.)
+ * Google blocks OAuth in these webviews for security reasons
+ */
+function isEmbeddedBrowser(): boolean {
+  const ua = navigator.userAgent || navigator.vendor || '';
+  return (
+    ua.includes('FBAN') || // Facebook App
+    ua.includes('FBAV') || // Facebook App
+    ua.includes('Instagram') ||
+    ua.includes('Twitter') ||
+    ua.includes('Line/') ||
+    ua.includes('KAKAOTALK') ||
+    ua.includes('Snapchat') ||
+    ua.includes('TikTok') ||
+    (ua.includes('wv') && ua.includes('Android')) // Android WebView
+  );
+}
 
 // ============================================================================
 // Form Schemas
@@ -65,6 +84,12 @@ export default function AuthPage() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true); // Default to staying signed in
+  const [inEmbeddedBrowser, setInEmbeddedBrowser] = useState(false);
+
+  // Check for embedded browser on mount
+  useEffect(() => {
+    setInEmbeddedBrowser(isEmbeddedBrowser());
+  }, []);
   
   // Handle case where auth context is not available yet
   const signIn = auth?.signInWithEmail;
@@ -342,13 +367,37 @@ export default function AuthPage() {
                   </div>
                 </div>
 
+                {/* Embedded Browser Warning */}
+                {inEmbeddedBrowser && (
+                  <div className="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3 mb-4">
+                    <p className="text-yellow-200 text-sm text-center">
+                      <strong>Google Sign-In not available</strong> in this browser.
+                      <br />
+                      <span className="text-yellow-300/80">
+                        Tap the menu (•••) and select "Open in Browser" or use email sign-in above.
+                      </span>
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2 border-yellow-600 text-yellow-200 hover:bg-yellow-900/50"
+                      onClick={() => window.open(window.location.href, '_system')}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open in Browser
+                    </Button>
+                  </div>
+                )}
+
                 {/* Google Sign In */}
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full border-gray-600 text-white hover:bg-gray-700"
+                  className={`w-full border-gray-600 text-white hover:bg-gray-700 ${
+                    inEmbeddedBrowser ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                   onClick={handleGoogleSignIn}
-                  disabled={isGoogleLoading}
+                  disabled={isGoogleLoading || inEmbeddedBrowser}
                 >
                   {isGoogleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -482,13 +531,37 @@ export default function AuthPage() {
                   </div>
                 </div>
 
+                {/* Embedded Browser Warning */}
+                {inEmbeddedBrowser && (
+                  <div className="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3 mb-4">
+                    <p className="text-yellow-200 text-sm text-center">
+                      <strong>Google Sign-In not available</strong> in this browser.
+                      <br />
+                      <span className="text-yellow-300/80">
+                        Tap the menu (•••) and select "Open in Browser" or use email sign-up above.
+                      </span>
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2 border-yellow-600 text-yellow-200 hover:bg-yellow-900/50"
+                      onClick={() => window.open(window.location.href, '_system')}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Open in Browser
+                    </Button>
+                  </div>
+                )}
+
                 {/* Google Sign Up */}
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full border-gray-600 text-white hover:bg-gray-700"
+                  className={`w-full border-gray-600 text-white hover:bg-gray-700 ${
+                    inEmbeddedBrowser ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                   onClick={handleGoogleSignIn}
-                  disabled={isGoogleLoading}
+                  disabled={isGoogleLoading || inEmbeddedBrowser}
                 >
                   {isGoogleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

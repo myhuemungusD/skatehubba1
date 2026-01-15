@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { SiGoogle } from "react-icons/si";
-import { UserCircle } from "lucide-react";
+import { UserCircle, ExternalLink } from "lucide-react";
 import { useAuth } from "../context/AuthProvider";
 import { trackEvent } from "../lib/analytics";
 import { Button } from "../components/ui/button";
@@ -11,6 +11,25 @@ import { Label } from "../components/ui/label";
 import { useToast } from "../hooks/use-toast";
 import { setAuthPersistence } from "../lib/firebase";
 
+/**
+ * Detect if running in an embedded browser (Instagram, Facebook, etc.)
+ * Google blocks OAuth in these webviews for security reasons
+ */
+function isEmbeddedBrowser(): boolean {
+  const ua = navigator.userAgent || navigator.vendor || '';
+  return (
+    ua.includes('FBAN') || // Facebook App
+    ua.includes('FBAV') || // Facebook App
+    ua.includes('Instagram') ||
+    ua.includes('Twitter') ||
+    ua.includes('Line/') ||
+    ua.includes('KAKAOTALK') ||
+    ua.includes('Snapchat') ||
+    ua.includes('TikTok') ||
+    (ua.includes('wv') && ua.includes('Android')) // Android WebView
+  );
+}
+
 export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -18,6 +37,12 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAnonymousLoading, setIsAnonymousLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true); // Default to staying signed in
+  const [inEmbeddedBrowser, setInEmbeddedBrowser] = useState(false);
+
+  // Check for embedded browser on mount
+  useEffect(() => {
+    setInEmbeddedBrowser(isEmbeddedBrowser());
+  }, []);
 
   // Redirect when authenticated
   useEffect(() => {
@@ -106,11 +131,38 @@ export default function LoginPage() {
               </Label>
             </div>
 
+            {/* Embedded Browser Warning */}
+            {inEmbeddedBrowser && (
+              <div className="bg-yellow-900/30 border border-yellow-600/50 rounded-lg p-3 mb-4">
+                <p className="text-yellow-200 text-sm text-center">
+                  <strong>Google Sign-In not available</strong> in this browser.
+                  <br />
+                  <span className="text-yellow-300/80">
+                    Tap the menu (•••) and select "Open in Browser" or use Guest sign-in below.
+                  </span>
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2 border-yellow-600 text-yellow-200 hover:bg-yellow-900/50"
+                  onClick={() => {
+                    // Try to open in system browser
+                    window.open(window.location.href, '_system');
+                  }}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open in Browser
+                </Button>
+              </div>
+            )}
+
             {/* Google Sign-In Button */}
             <Button
               onClick={handleGoogleSignIn}
-              disabled={isLoading}
-              className="w-full bg-white hover:bg-gray-100 text-black font-semibold flex items-center justify-center gap-2 h-12"
+              disabled={isLoading || inEmbeddedBrowser}
+              className={`w-full bg-white hover:bg-gray-100 text-black font-semibold flex items-center justify-center gap-2 h-12 ${
+                inEmbeddedBrowser ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
               data-testid="button-google-signin"
             >
               <SiGoogle className="w-5 h-5" />
