@@ -1,9 +1,24 @@
-// client/src/lib/firebase/config.ts
+/**
+ * Firebase Application Configuration
+ *
+ * Single source of truth for Firebase initialization.
+ * Uses Vite environment variables and fails fast if misconfigured.
+ *
+ * Firebase API keys are safe to expose in client code.
+ * Security is enforced via Firebase Security Rules.
+ *
+ * @see https://firebase.google.com/docs/projects/api-keys
+ * @module lib/firebase/config
+ */
 
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getFunctions, type Functions } from "firebase/functions";
+
+// ============================================================================
+// Types
+// ============================================================================
 
 export interface FirebaseConfig {
   apiKey: string;
@@ -15,10 +30,10 @@ export interface FirebaseConfig {
   measurementId?: string;
 }
 
-/**
- * Resolve Firebase config from Vite environment variables.
- * Fails fast if required variables are missing.
- */
+// ============================================================================
+// Config Resolution (env-only, fail fast)
+// ============================================================================
+
 function getFirebaseConfig(): FirebaseConfig {
   const config: FirebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -52,7 +67,9 @@ function getFirebaseConfig(): FirebaseConfig {
   return config;
 }
 
-// ---------- Firebase initialization ----------
+// ============================================================================
+// Firebase Initialization (singleton)
+// ============================================================================
 
 let app: FirebaseApp;
 let auth: Auth;
@@ -76,6 +93,8 @@ function initFirebase() {
 // Initialize immediately on import (client-safe)
 initFirebase();
 
-// ---------- Public exports ----------
+// ============================================================================
+// Public exports
+// ============================================================================
 
 export { app, auth, db, functions, isFirebaseInitialized };
