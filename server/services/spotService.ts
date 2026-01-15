@@ -94,7 +94,7 @@ export async function verifyAndCheckIn(
   }
 
   try {
-    const checkIn = await db.transaction(async (tx) => {
+    const checkIn = await db.transaction(async (tx: typeof db) => {
       const [createdCheckIn] = await tx
         .insert(checkIns)
         .values({
