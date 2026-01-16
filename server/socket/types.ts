@@ -61,7 +61,7 @@ export interface BattleVotePayload {
 export interface BattleCompletedPayload {
   battleId: string;
   winnerId?: string;
-  finalScore: { [userId: string]: number };
+  finalScore: { [odv: string]: number };
   completedAt: string;
 }
 
