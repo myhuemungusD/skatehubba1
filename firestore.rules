@@ -40,6 +40,35 @@ service cloud.firestore {
       return isAuthenticated() 
         && (gameData.player1Id == request.auth.uid || gameData.player2Id == request.auth.uid);
     }
+
+    // =========================================================================
+    // ENVIRONMENT NAMESPACED DATA
+    // New data should use /env/{environment}/ prefix for isolation.
+    // 
+    // IMPORTANT: 'local' is NOT allowed in production Firestore.
+    // Local development should use Firebase Emulator instead.
+    // 
+    // KNOWN LIMITATION: Without custom claims, we cannot enforce that a
+    // staging build only writes to /env/staging/. The guardrails in
+    // @skatehubba/config provide client-side enforcement. Full server-side
+    // enforcement requires custom token claims (tracked for future release).
+    // =========================================================================
+    
+    // Staging environment - full read/write for authenticated users
+    match /env/staging/{path=**} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Production environment - read allowed, writes restricted for sensitive paths
+    match /env/prod/{collection}/{docId=**} {
+      // Reads always allowed for authenticated users
+      allow read: if isAuthenticated();
+      
+      // Writes: block client writes to sensitive collections
+      // These should go through Cloud Functions or server API
+      allow write: if isAuthenticated()
+        && !(collection in ['billing', 'admin', 'moderation', 'analytics_events']);
+    }
     
     // =========================================================================
     // USER PROFILES
