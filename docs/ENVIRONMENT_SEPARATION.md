@@ -140,21 +140,38 @@ Create two projects in Vercel:
 
 ### 3. Firestore Security Rules
 
-Update rules to enforce namespace isolation:
+The production rules enforce namespace isolation:
 
 ```js
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Environment-namespaced data
-    match /env/{environment}/{path=**} {
-      // Only allow access to your own environment
-      allow read, write: if request.auth != null
-        && environment == request.auth.token.env;
-    }
-  }
+// Staging - full access for authenticated users
+match /env/staging/{path=**} {
+  allow read, write: if isAuthenticated();
+}
+
+// Production - restricted writes for sensitive collections
+match /env/prod/{collection}/{docId=**} {
+  allow read: if isAuthenticated();
+  allow write: if isAuthenticated()
+    && !(collection in ['billing', 'admin', 'moderation', 'analytics_events']);
 }
 ```
+
+> **Note:** `local` is NOT allowed in production Firestore. Use Firebase Emulator for local development.
+
+## Known Limitations
+
+### Claims-Based Enforcement Not Yet Implemented
+
+Currently, Firestore rules enforce **path namespacing** but cannot verify that a staging build only writes to `/env/staging/`. A malicious or misconfigured client could theoretically write to `/env/prod/` if authenticated.
+
+**Mitigations in place:**
+
+- Client-side `assertEnvWiring()` fails fast on misconfiguration
+- `validateWritePath()` blocks cross-environment writes in code
+- Sensitive prod collections (`billing`, `admin`, `moderation`, `analytics_events`) are write-protected
+- Staging banner makes environment visually obvious
+
+**Future enhancement:** Add custom claims (`{ env: 'prod' }`) to Firebase Auth tokens via Cloud Functions, then enforce `request.auth.token.env == environment` in rules.
 
 ## Validation Checklist
 

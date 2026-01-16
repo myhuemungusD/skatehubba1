@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/React-18.3-61dafb.svg)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![CI](https://github.com/myhuemungusD/skatehubba1/actions/workflows/ci.yml/badge.svg)](https://github.com/myhuemungusD/skatehubba1/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-84%20passing-brightgreen.svg)](./vitest.config.mts)
+[![Tests](https://img.shields.io/badge/Tests-133%20passing-brightgreen.svg)](./vitest.config.mts)
 [![Coverage](https://img.shields.io/badge/Coverage-3%25-red.svg)](./vitest.config.mts)
 [![CodeQL](https://github.com/myhuemungusD/skatehubba1/actions/workflows/codeql.yml/badge.svg)](https://github.com/myhuemungusD/skatehubba1/security/code-scanning)
 [![Security](https://img.shields.io/badge/Vulnerabilities-0-brightgreen.svg)](https://github.com/myhuemungusD/skatehubba1/security)
@@ -156,7 +156,28 @@ flowchart TB
 
 ---
 
-## 🚀 Getting Started
+## � Environment Separation
+
+SkateHubba uses **enterprise-grade environment separation** with a single Firebase project:
+
+| Environment | Purpose                     | Firestore Namespace |
+| ----------- | --------------------------- | ------------------- |
+| `prod`      | Production users            | `/env/prod/...`     |
+| `staging`   | Testing & QA                | `/env/staging/...`  |
+| `local`     | Development (emulator only) | `/env/local/...`    |
+
+**Key features:**
+
+- **Runtime guardrails** - `assertEnvWiring()` fails fast on misconfigurations
+- **Visual indicators** - Yellow "STAGING" banner in non-prod environments
+- **Path namespacing** - `getEnvPath()` ensures data isolation
+- **133 tests** validating environment architecture
+
+See [docs/ENVIRONMENT_SEPARATION.md](docs/ENVIRONMENT_SEPARATION.md) for the full setup guide.
+
+---
+
+## �🚀 Getting Started
 
 ### Prerequisites
 
