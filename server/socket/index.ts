@@ -7,6 +7,8 @@
  * - Rate limiting
  * - Graceful shutdown
  * - Monitoring/metrics
+ * - Health monitoring
+ * - Input validation
  */
 
 import { Server as HttpServer } from "http";
@@ -21,6 +23,14 @@ import {
   handlePresenceDisconnect,
   getPresenceStats,
 } from "./handlers/presence";
+import {
+  initSocketHealth,
+  cleanupSocketHealth,
+  recordMessage,
+  startHealthMonitor,
+  stopHealthMonitor,
+  getHealthStats,
+} from "./health";
 import type {
   ClientToServerEvents,
   ServerToClientEvents,
@@ -33,6 +43,7 @@ export type { ClientToServerEvents, ServerToClientEvents, SocketData } from "./t
 
 // Track connected sockets for metrics
 let connectedSockets = 0;
+let healthMonitorInterval: NodeJS.Timeout | null = null;
 
 /**
  * Initialize Socket.io server
@@ -67,10 +78,16 @@ export function initializeSocketServer(
   // Authentication middleware
   io.use(socketAuthMiddleware);
 
+  // Start health monitor
+  healthMonitorInterval = startHealthMonitor(io);
+
   // Connection handler
   io.on("connection", async (socket) => {
     connectedSockets++;
     const data = socket.data as SocketData;
+
+    // Initialize health tracking
+    initSocketHealth(socket);
 
     logger.info("[Socket] Client connected", {
       socketId: socket.id,
@@ -124,6 +141,7 @@ export function initializeSocketServer(
       await cleanupGameSubscriptions(socket);
       await leaveAllRooms(socket);
       handlePresenceDisconnect(io, socket);
+      cleanupSocketHealth(socket.id);
     });
 
     // Error handling
@@ -159,11 +177,13 @@ export function getSocketStats(): {
   connections: number;
   rooms: ReturnType<typeof getRoomStats>;
   presence: ReturnType<typeof getPresenceStats>;
+  health: ReturnType<typeof getHealthStats>;
 } {
   return {
     connections: connectedSockets,
     rooms: getRoomStats(),
     presence: getPresenceStats(),
+    health: getHealthStats(),
   };
 }
 
@@ -191,6 +211,12 @@ export async function shutdownSocketServer(
   io: Server<ClientToServerEvents, ServerToClientEvents>
 ): Promise<void> {
   logger.info("[Socket] Shutting down...");
+
+  // Stop health monitor
+  if (healthMonitorInterval) {
+    stopHealthMonitor(healthMonitorInterval);
+    healthMonitorInterval = null;
+  }
 
   // Notify all clients
   broadcastSystemNotification(
