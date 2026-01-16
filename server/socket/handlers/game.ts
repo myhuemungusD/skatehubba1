@@ -49,7 +49,7 @@ function generateGameId(): string {
 function getNextLetter(currentLetters: string): string {
   const SKATE = "SKATE";
   const nextIndex = currentLetters.length;
-  return nextIndex < SKATE.length ? SKATE[nextIndex] : currentLetters;
+  return nextIndex < SKATE.length ? currentLetters + SKATE[nextIndex] : currentLetters;
 }
 
 /**
