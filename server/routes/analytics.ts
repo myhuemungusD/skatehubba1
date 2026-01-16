@@ -36,7 +36,7 @@ analyticsRouter.post("/events", requireFirebaseUid, async (req: Request, res: Re
   const ev = parsed.data;
 
   // Validate per-event properties (strict where it matters)
-  let props: Record<string, unknown> = ev.properties;
+  let props: Record<string, unknown>;
   try {
     props = validateEventProps(ev.event_name, ev.properties);
   } catch (validationError) {
