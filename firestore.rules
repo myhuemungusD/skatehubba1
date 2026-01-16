@@ -40,6 +40,18 @@ service cloud.firestore {
       return isAuthenticated() 
         && (gameData.player1Id == request.auth.uid || gameData.player2Id == request.auth.uid);
     }
+
+    // =========================================================================
+    // ENVIRONMENT NAMESPACED DATA
+    // New data should use /env/{environment}/ prefix for isolation.
+    // environment must be 'prod', 'staging', or 'local'
+    // =========================================================================
+    
+    match /env/{environment}/{path=**} {
+      // Only allow valid environment names
+      allow read, write: if isAuthenticated()
+        && environment in ['prod', 'staging', 'local'];
+    }
     
     // =========================================================================
     // USER PROFILES

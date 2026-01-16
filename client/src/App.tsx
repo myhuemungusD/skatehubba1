@@ -1,4 +1,3 @@
-
 import { useEffect, lazy, Suspense } from "react";
 import { Router, Route, Switch, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
@@ -9,6 +8,7 @@ import { useToast } from "./hooks/use-toast";
 import { useAuth, AuthProvider } from "./context/AuthProvider";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { PWAInstallPrompt } from "./components/PWAInstallPrompt";
+import { StagingBanner } from "./components/StagingBanner";
 import { OrganizationStructuredData, WebAppStructuredData } from "./components/StructuredData";
 import { analytics as firebaseAnalytics } from "./lib/firebase";
 import { usePerformanceMonitor } from "./hooks/usePerformanceMonitor";
@@ -180,25 +180,25 @@ function GoogleRedirectWelcome() {
 
   useEffect(() => {
     // Check if we just completed a Google redirect login
-    const wasGoogleRedirect = sessionStorage.getItem('googleRedirectPending');
-    
+    const wasGoogleRedirect = sessionStorage.getItem("googleRedirectPending");
+
     if (wasGoogleRedirect && !loading && user) {
       // Clear the flag
-      sessionStorage.removeItem('googleRedirectPending');
-      
-      logger.info('[Google Auth] Successfully authenticated via redirect');
+      sessionStorage.removeItem("googleRedirectPending");
+
+      logger.info("[Google Auth] Successfully authenticated via redirect");
       toast({
         title: "Welcome! 🛹",
-        description: "You've successfully signed in with Google."
+        description: "You've successfully signed in with Google.",
       });
     } else if (wasGoogleRedirect && !loading && !user) {
       // Redirect failed - clear the flag and show error
-      sessionStorage.removeItem('googleRedirectPending');
-      logger.error('[Google Auth] Redirect authentication failed - no user after redirect');
+      sessionStorage.removeItem("googleRedirectPending");
+      logger.error("[Google Auth] Redirect authentication failed - no user after redirect");
       toast({
         title: "Sign-in failed",
         description: "Unable to complete Google Sign-In. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     }
   }, [user, loading, toast]);
@@ -209,13 +209,13 @@ function GoogleRedirectWelcome() {
 export default function App() {
   // Monitor performance in development
   usePerformanceMonitor();
-  
+
   // Enable skip link for accessibility
   useSkipLink();
 
   useEffect(() => {
     if (firebaseAnalytics) {
-      logger.info('Firebase Analytics initialized successfully');
+      logger.info("Firebase Analytics initialized successfully");
     }
   }, []);
 
@@ -224,17 +224,17 @@ export default function App() {
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
+            {/* Environment indicator - shows in staging/local only */}
+            <StagingBanner />
             <GoogleRedirectWelcome />
             <OrganizationStructuredData
               data={{
                 name: "SkateHubba",
                 url: "https://skatehubba.com",
                 logo: "https://skatehubba.com/icon-512.png",
-                description: "Remote SKATE battles, legendary spot check-ins, and live lobbies. Join the ultimate skateboarding social platform.",
-                sameAs: [
-                  "https://twitter.com/skatehubba_app",
-                  "https://instagram.com/skatehubba",
-                ],
+                description:
+                  "Remote SKATE battles, legendary spot check-ins, and live lobbies. Join the ultimate skateboarding social platform.",
+                sameAs: ["https://twitter.com/skatehubba_app", "https://instagram.com/skatehubba"],
               }}
             />
             <WebAppStructuredData
