@@ -36,9 +36,27 @@ export function assertEnvWiring(): void {
   const firebaseAppId = getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_APP_ID") ?? "";
 
   // Check API base URL consistency
-  const apiLooksProd = apiBase.includes("api.skatehubba.com") && !apiBase.includes("staging");
-  const apiLooksStaging = apiBase.includes("staging");
-  const apiLooksLocal = apiBase.includes("localhost") || apiBase.includes("127.0.0.1");
+  let apiLooksProd = false;
+  let apiLooksStaging = false;
+  let apiLooksLocal = false;
+
+  if (apiBase) {
+    try {
+      const parsed = new URL(apiBase);
+      const host = parsed.hostname;
+
+      // Treat the canonical production API host as prod.
+      apiLooksProd = host === "api.skatehubba.com";
+
+      // Treat known staging hosts as staging. Adjust if additional staging hosts are introduced.
+      apiLooksStaging = host === "staging-api.skatehubba.com";
+
+      // Local development hosts.
+      apiLooksLocal = host === "localhost" || host === "127.0.0.1";
+    } catch {
+      // If the URL is invalid, leave all flags false and let existing checks handle it.
+    }
+  }
 
   if (env === "prod") {
     if (apiLooksStaging) {
