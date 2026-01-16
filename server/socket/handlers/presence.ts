@@ -69,7 +69,7 @@ export function registerPresenceHandlers(io: TypedServer, socket: TypedSocket): 
   socket.broadcast.emit("presence:update", presencePayload);
 
   // Handle status updates
-  socket.on("presence:update", (status) => {
+  socket.on("presence:update", (status: "online" | "away") => {
     const existing = onlineUsers.get(data.odv);
     if (existing) {
       existing.status = status;

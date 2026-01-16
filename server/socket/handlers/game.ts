@@ -68,7 +68,7 @@ export function registerGameHandlers(io: TypedServer, socket: TypedSocket): void
   /**
    * Create a new S.K.A.T.E. game
    */
-  socket.on("game:create", async (spotId, maxPlayers = 4) => {
+  socket.on("game:create", async (spotId: string, maxPlayers: number = 4) => {
     try {
       const gameId = generateGameId();
 
@@ -113,7 +113,7 @@ export function registerGameHandlers(io: TypedServer, socket: TypedSocket): void
   /**
    * Join an existing game
    */
-  socket.on("game:join", async (gameId) => {
+  socket.on("game:join", async (gameId: string) => {
     try {
       const game = games.get(gameId);
 
@@ -195,105 +195,108 @@ export function registerGameHandlers(io: TypedServer, socket: TypedSocket): void
   /**
    * Submit a trick
    */
-  socket.on("game:trick", async (input) => {
-    try {
-      const game = games.get(input.gameId);
+  socket.on(
+    "game:trick",
+    async (input: { gameId: string; odv: string; trickName: string; clipUrl?: string }) => {
+      try {
+        const game = games.get(input.gameId);
 
-      if (!game || game.status !== "active") {
-        socket.emit("error", {
-          code: "invalid_game_state",
-          message: "Game is not active",
-        });
-        return;
-      }
-
-      const currentPlayer = game.players[game.currentTurn];
-
-      if (currentPlayer !== data.odv) {
-        socket.emit("error", {
-          code: "not_your_turn",
-          message: "It's not your turn",
-        });
-        return;
-      }
-
-      const trickPayload: GameTrickPayload = {
-        gameId: input.gameId,
-        odv: data.odv,
-        trickName: input.trickName,
-        clipUrl: input.clipUrl,
-        sentAt: new Date().toISOString(),
-      };
-
-      // Broadcast trick to all players
-      broadcastToRoom(io, "game", input.gameId, "game:trick", trickPayload);
-
-      // Move to next phase/player
-      const originalSetter = game.players[game.currentTurn];
-      if (game.currentAction === "set") {
-        // Setter landed, now others attempt
-        game.currentAction = "attempt";
-        game.currentTurn = (game.currentTurn + 1) % game.players.length;
-
-        // Skip the setter
-        if (game.players[game.currentTurn] === originalSetter) {
-          game.currentTurn = (game.currentTurn + 1) % game.players.length;
+        if (!game || game.status !== "active") {
+          socket.emit("error", {
+            code: "invalid_game_state",
+            message: "Game is not active",
+          });
+          return;
         }
-      } else {
-        // Attempt succeeded, move to next player
-        game.currentTurn = (game.currentTurn + 1) % game.players.length;
 
-        // Check if round complete (back to setter)
-        if (game.currentAction === "attempt") {
-          // After all attempts, new setter
-          game.currentAction = "set";
+        const currentPlayer = game.players[game.currentTurn];
+
+        if (currentPlayer !== data.odv) {
+          socket.emit("error", {
+            code: "not_your_turn",
+            message: "It's not your turn",
+          });
+          return;
         }
-      }
 
-      // Check for eliminated players
-      const activePlayers = game.players.filter((p) => !isEliminated(game.letters.get(p) || ""));
-
-      if (activePlayers.length === 1) {
-        // Game over!
-        game.status = "completed";
-
-        broadcastToRoom(io, "game", input.gameId, "game:ended", {
+        const trickPayload: GameTrickPayload = {
           gameId: input.gameId,
-          winnerId: activePlayers[0],
-          finalStandings: game.players.map((p) => ({
-            odv: p,
-            letters: game.letters.get(p) || "",
-          })),
-        });
-      } else {
-        // Next turn
-        const turnPayload: GameTurnPayload = {
-          gameId: input.gameId,
-          currentPlayer: game.players[game.currentTurn],
-          action: game.currentAction,
+          odv: data.odv,
+          trickName: input.trickName,
+          clipUrl: input.clipUrl,
+          sentAt: new Date().toISOString(),
         };
 
-        broadcastToRoom(io, "game", input.gameId, "game:turn", turnPayload);
-      }
+        // Broadcast trick to all players
+        broadcastToRoom(io, "game", input.gameId, "game:trick", trickPayload);
 
-      logger.info("[Game] Trick submitted", {
-        gameId: input.gameId,
-        odv: data.odv,
-        trick: input.trickName,
-      });
-    } catch (error) {
-      logger.error("[Game] Trick failed", { error, input, odv: data.odv });
-      socket.emit("error", {
-        code: "trick_failed",
-        message: "Failed to submit trick",
-      });
+        // Move to next phase/player
+        const originalSetter = game.players[game.currentTurn];
+        if (game.currentAction === "set") {
+          // Setter landed, now others attempt
+          game.currentAction = "attempt";
+          game.currentTurn = (game.currentTurn + 1) % game.players.length;
+
+          // Skip the setter
+          if (game.players[game.currentTurn] === originalSetter) {
+            game.currentTurn = (game.currentTurn + 1) % game.players.length;
+          }
+        } else {
+          // Attempt succeeded, move to next player
+          game.currentTurn = (game.currentTurn + 1) % game.players.length;
+
+          // Check if round complete (back to setter)
+          if (game.currentAction === "attempt") {
+            // After all attempts, new setter
+            game.currentAction = "set";
+          }
+        }
+
+        // Check for eliminated players
+        const activePlayers = game.players.filter((p) => !isEliminated(game.letters.get(p) || ""));
+
+        if (activePlayers.length === 1) {
+          // Game over!
+          game.status = "completed";
+
+          broadcastToRoom(io, "game", input.gameId, "game:ended", {
+            gameId: input.gameId,
+            winnerId: activePlayers[0],
+            finalStandings: game.players.map((p) => ({
+              odv: p,
+              letters: game.letters.get(p) || "",
+            })),
+          });
+        } else {
+          // Next turn
+          const turnPayload: GameTurnPayload = {
+            gameId: input.gameId,
+            currentPlayer: game.players[game.currentTurn],
+            action: game.currentAction,
+          };
+
+          broadcastToRoom(io, "game", input.gameId, "game:turn", turnPayload);
+        }
+
+        logger.info("[Game] Trick submitted", {
+          gameId: input.gameId,
+          odv: data.odv,
+          trick: input.trickName,
+        });
+      } catch (error) {
+        logger.error("[Game] Trick failed", { error, input, odv: data.odv });
+        socket.emit("error", {
+          code: "trick_failed",
+          message: "Failed to submit trick",
+        });
+      }
     }
-  });
+  );
 
   /**
    * Pass on a trick (gets a letter)
    */
-  socket.on("game:pass", async (gameId) => {
+  socket.on("game:pass", async (gameId: string) => {
     try {
       const game = games.get(gameId);
 

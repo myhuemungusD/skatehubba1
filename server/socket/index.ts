@@ -108,16 +108,22 @@ export function initializeSocketServer(
     registerGameHandlers(io, socket);
 
     // Room management
-    socket.on("room:join", async (roomType, roomId) => {
-      await joinRoom(socket, roomType, roomId);
-    });
+    socket.on(
+      "room:join",
+      async (roomType: "battle" | "game" | "spot" | "global", roomId: string) => {
+        await joinRoom(socket, roomType, roomId);
+      }
+    );
 
-    socket.on("room:leave", async (roomType, roomId) => {
-      await leaveRoom(socket, roomType, roomId);
-    });
+    socket.on(
+      "room:leave",
+      async (roomType: "battle" | "game" | "spot" | "global", roomId: string) => {
+        await leaveRoom(socket, roomType, roomId);
+      }
+    );
 
     // Typing indicators
-    socket.on("typing", (roomId, isTyping) => {
+    socket.on("typing", (roomId: string, isTyping: boolean) => {
       socket.to(roomId).emit("typing", {
         odv: data.odv,
         roomId,
@@ -126,7 +132,7 @@ export function initializeSocketServer(
     });
 
     // Handle disconnection
-    socket.on("disconnect", async (reason) => {
+    socket.on("disconnect", async (reason: string) => {
       connectedSockets--;
 
       logger.info("[Socket] Client disconnected", {
@@ -145,7 +151,7 @@ export function initializeSocketServer(
     });
 
     // Error handling
-    socket.on("error", (error) => {
+    socket.on("error", (error: Error) => {
       logger.error("[Socket] Socket error", {
         socketId: socket.id,
         odv: data.odv,
@@ -155,7 +161,7 @@ export function initializeSocketServer(
   });
 
   // Engine-level error handling
-  io.engine.on("connection_error", (err) => {
+  io.engine.on("connection_error", (err: { code: number; message: string; context?: unknown }) => {
     logger.error("[Socket] Connection error", {
       code: err.code,
       message: err.message,
