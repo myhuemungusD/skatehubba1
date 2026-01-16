@@ -39,6 +39,7 @@ import {
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInAnonymously as firebaseSignInAnonymously,
@@ -283,6 +284,42 @@ export function AuthProvider({ children, LoadingComponent }: AuthProviderProps) 
 
     return () => unsubscribe();
   }, [getOrCreateProfile, extractRolesFromToken]);
+
+  // ---------------------------------------------------------------------------
+  // Handle Google Redirect Result
+  // ---------------------------------------------------------------------------
+  
+  useEffect(() => {
+    // Handle redirect result when returning from Google OAuth on mobile
+    const handleRedirectResult = async () => {
+      try {
+        console.log('[AuthProvider] Checking for redirect result...');
+        const result = await getRedirectResult(auth);
+        
+        if (result && result.user) {
+          console.log('[AuthProvider] Redirect result found, user:', result.user.uid);
+          // The onAuthStateChanged listener will handle setting the user state
+          // but we can clear any pending flags here
+          sessionStorage.removeItem('googleRedirectPending');
+        } else {
+          console.log('[AuthProvider] No redirect result (normal page load)');
+        }
+      } catch (err: any) {
+        console.error('[AuthProvider] Redirect result error:', err);
+        sessionStorage.removeItem('googleRedirectPending');
+        
+        // Set error so UI can display it
+        setError(err);
+        
+        // Handle specific redirect errors
+        if (err.code === 'auth/account-exists-with-different-credential') {
+          setError(new Error('An account already exists with this email using a different sign-in method'));
+        }
+      }
+    };
+    
+    handleRedirectResult();
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Actions
