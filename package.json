@@ -20,6 +20,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "validate:packages": "node scripts/validate-packages.mjs",
+    "validate:env": "node scripts/validate-env.mjs",
+    "validate:env:prod": "node scripts/validate-env.mjs --production",
+    "precommit": "lint-staged",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -38,6 +41,8 @@
     ]
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.3.1",
+    "@commitlint/config-conventional": "^20.3.1",
     "@eslint/js": "^9.39.2",
     "@vitest/coverage-v8": "^4.0.17",
     "concurrently": "^9.2.1",
