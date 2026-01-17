@@ -21,7 +21,6 @@ interface Player {
 
 interface TrickBattleArenaProps {
   spotId: string;
-  userId: string;
 }
 
 const TRICKS: Trick[] = [
