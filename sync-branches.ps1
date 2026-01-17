@@ -21,7 +21,7 @@ Write-Host "`nFound $($branches.Count) remote branches" -ForegroundColor Green
     
     # Checkout branch
     git checkout $branch 2>&1 | Out-Null
-        git pull origin $branch
+
     if ($LASTEXITCODE -eq 0) {
         # Pull latest
         Write-Host "  Pulling latest changes..." -ForegroundColor White

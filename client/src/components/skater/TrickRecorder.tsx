@@ -21,7 +21,7 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     startCamera();
@@ -32,7 +32,7 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
 
   useEffect(() => {
     if (isRecording) {
-      timerRef.current = setInterval(() => {
+      timerRef.current = window.setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } else {

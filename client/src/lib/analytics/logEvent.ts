@@ -1,5 +1,6 @@
 import { AnalyticsIngestSchema, type EventName } from "@shared/analytics-events";
 import { auth } from "../firebase";
+import { getAppConfig } from '@skatehubba/config';
 
 /**
  * Generate a ULID-like unique ID for event idempotency.
@@ -97,10 +98,6 @@ export async function logEvent(
       occurred_at: new Date().toISOString(),
       session_id: getSessionId(),
       source: "web" as const,
-import { getAppConfig } from '@skatehubba/config';
-
-// ... existing imports ...
-
       app_version: getAppConfig().version,
       properties,
     };

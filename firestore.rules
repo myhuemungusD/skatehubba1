@@ -71,16 +71,32 @@ service cloud.firestore {
     }
     
     // =========================================================================
-    // USER PROFILES - READ ONLY (Profile data lives in PostgreSQL)
+    // USER PROFILES - FIRESTORE DEPRECATED, READ-ONLY BACKWARD COMPAT
+    // Profile data now lives in PostgreSQL (customUsers table) and Postgres is
+    // the single source of truth for profile fields.
     // =========================================================================
     
     match /users/{userId} {
-      // DEPRECATED: User profiles are now stored in PostgreSQL (customUsers table)
-      // This path is kept for backward compatibility with presence/real-time features
-      // Only allow reading presence data, not full profiles
+      // DEPRECATED: Historically, user profiles were stored in Firestore under
+      // /users/{userId}. New and updated profile data MUST be written only via
+      // the backend/API into PostgreSQL (customUsers table), not to Firestore.
+      //
+      // Migration/transition strategy:
+      // - Existing Firestore user documents remain READ-ONLY and may be used by
+      //   legacy clients for minimal display/presence-related data during the
+      //   transition period.
+      // - No new profile documents or updates should be written to /users/*
+      //   directly; any data backfill or migration to PostgreSQL must be done
+      //   via backend jobs/Cloud Functions or other server-side tooling.
+      // - Once all clients have migrated to PostgreSQL-backed profiles, this
+      //   collection can be safely removed.
+      //
+      // Only allow reading presence/legacy profile data, not mutating it.
       allow read: if isAuthenticated();
       
-      // Block all writes - profiles must be updated via API (which writes to Postgres)
+      // Block all writes permanently - profiles must be updated via API/backends
+      // which write to PostgreSQL; this ensures Firestore data is effectively
+      // frozen and cannot diverge from Postgres.
       allow write: if false;
     }
     

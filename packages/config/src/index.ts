@@ -19,7 +19,7 @@
  * const env = getAppEnv(); // 'prod' | 'staging' | 'local'
  *
  * // Get Firebase config
- * const config = getFirebaseEnv();
+ * const config = getFirebaseConfig();
  * ```
  *
  * ## Environment Variables
