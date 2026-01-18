@@ -15,8 +15,9 @@ $branches = git branch -r | Where-Object { $_ -notmatch 'HEAD' -and $_ -match 'o
 }
 
 Write-Host "`nFound $($branches.Count) remote branches" -ForegroundColor Green
-    # Checkout branch (suppress normal output but allow errors to be shown)
-    git checkout $branch 1> $null
+
+# Process each branch
+foreach ($branch in $branches) {
     Write-Host "`n--- Processing branch: $branch ---" -ForegroundColor Yellow
     
     # Checkout branch
