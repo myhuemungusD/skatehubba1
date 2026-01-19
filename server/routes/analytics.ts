@@ -98,7 +98,21 @@ analyticsRouter.post(
   validateBody(AnalyticsBatchSchema, { errorCode: "invalid_event" }),
   async (req: Request, res: Response) => {
     const uid = (req as FirebaseAuthedRequest).firebaseUid;
-    const batch = req.body as AnalyticsBatch;
+
+    // Defensive runtime check to avoid type confusion on req.body
+    const body = req.body;
+    if (
+      !Array.isArray(body) ||
+      body.some((item) => item === null || typeof item !== "object")
+    ) {
+      logger.warn("[Analytics] Invalid batch payload type", {
+        uid,
+        payloadType: typeof body,
+      });
+      return res.status(400).json({ error: "invalid_event" });
+    }
+
+    const batch = body as AnalyticsBatch;
 
     if (!db) {
       logger.warn("[Analytics] Database not configured, dropping batch", {
