@@ -163,38 +163,44 @@ function readEnvConfig(env: AppEnv): FirebaseConfig | null {
     env === "prod" ? "_PROD" : env === "staging" ? "_STAGING" : "";
 
   const apiKey =
-    (suffix && getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_API_KEY${suffix}`)) ||
+    (suffix !== "" &&
+      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_API_KEY${suffix}`)) ||
     getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_API_KEY");
 
   const projectId =
-    (suffix && getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_PROJECT_ID${suffix}`)) ||
+    (suffix !== "" &&
+      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_PROJECT_ID${suffix}`)) ||
     getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_PROJECT_ID");
 
   const appId =
-    (suffix && getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_APP_ID${suffix}`)) ||
+    (suffix !== "" &&
+      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_APP_ID${suffix}`)) ||
     getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_APP_ID");
 
   // If key pieces are missing, treat as not-configured
   if (!apiKey || !projectId || !appId) return null;
 
   const authDomain =
-    (suffix && getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN${suffix}`)) ||
+    (suffix !== "" &&
+      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN${suffix}`)) ||
     getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN") ||
     `${projectId}.firebaseapp.com`;
 
   const storageBucket =
-    (suffix && getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET${suffix}`)) ||
+    (suffix !== "" &&
+      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET${suffix}`)) ||
     getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET") ||
     `${projectId}.firebasestorage.app`;
 
   const messagingSenderId =
-    (suffix &&
+    (suffix !== "" &&
       getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID${suffix}`)) ||
     getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID") ||
     BASE_PROJECT.messagingSenderId;
 
   const measurementId =
-    (suffix && getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID${suffix}`)) ||
+    (suffix !== "" &&
+      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID${suffix}`)) ||
     getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID");
 
   return {
