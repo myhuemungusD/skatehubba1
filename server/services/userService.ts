@@ -22,6 +22,7 @@ export interface CreateUserInput {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  phoneNumber?: string | null;
   profileImageUrl?: string | null;
   // roles intentionally omitted from DB (Firebase Custom Claims)
 }
@@ -29,6 +30,10 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   firstName?: string | null;
   lastName?: string | null;
+  bio?: string | null;
+  location?: string | null;
+  phoneNumber?: string | null;
+  photoUrl?: string | null;
   profileImageUrl?: string | null;
   onboardingCompleted?: boolean;
   currentTutorialStep?: number;
@@ -53,6 +58,7 @@ export async function createUser(input: CreateUserInput): Promise<User> {
       email: input.email,
       firstName: input.firstName ?? null,
       lastName: input.lastName ?? null,
+      phoneNumber: input.phoneNumber ?? null,
       profileImageUrl: input.profileImageUrl ?? null,
     })
     .returning();
