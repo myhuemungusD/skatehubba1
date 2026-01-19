@@ -77,10 +77,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid request", issues: parsed.error.flatten() });
       }
 
-      const userId = req.currentUser?.id;
-      if (!userId) {
-        return res.status(401).json({ message: "Authentication required" });
-      }
+      // authenticateUser guarantees req.currentUser is defined here (type narrowing)
+      const userId = req.currentUser!.id;
 
       const { spotId, lat, lng } = parsed.data;
 
