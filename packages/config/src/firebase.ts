@@ -36,7 +36,7 @@ export interface FirebaseConfig {
  * for misconfigured local environments only.
  */
 const PRODUCTION_CONFIG: FirebaseConfig = {
-  apiKey: getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_API_KEY_PROD") ?? "DUMMY_FIREBASE_API_KEY",
+  apiKey: "AIzaSyD6kLt4GKV4adX-oQ3m_aXIpL6GXBP0xZw",
   authDomain: "sk8hub-d7806.firebaseapp.com",
   projectId: "sk8hub-d7806",
   storageBucket: "sk8hub-d7806.firebasestorage.app",
@@ -70,15 +70,15 @@ export function getFirebaseConfig(): FirebaseConfig {
 
   // Try to read from env vars first (allows override)
   const envConfig: FirebaseConfig | null = (() => {
-    const apiKey = getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_API_KEY");
-    const projectId = getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_PROJECT_ID");
+    const apiKey = "AIzaSyD6kLt4GKV4adX-oQ3m_aXIpL6GXBP0xZw");
+    const projectId = "sk8hub-d7806";
 
     if (!apiKey || !projectId) return null;
 
     return {
       apiKey,
       authDomain:
-        getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN") || `${projectId}.firebaseapp.com`,
+        getPublicEnvOptional("AIzaSyD6kLt4GKV4adX-oQ3m_aXIpL6GXBP0xZw") || `${"sk8hub-d7806"}.firebaseapp.com`,
       projectId,
       storageBucket:
         getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET") ||
