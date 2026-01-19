@@ -65,6 +65,23 @@ app.use(compression());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// Request logging
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const durationMs = Date.now() - start;
+    logger.info("HTTP request", {
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      durationMs,
+      ip: req.ip,
+      userAgent: req.get("User-Agent"),
+    });
+  });
+  next();
+});
+
 // Cookie parsing - MUST come before CSRF token creation
 // lgtm[js/missing-token-validation] - CSRF protection is implemented via ensureCsrfToken/requireCsrfToken below
 // codeql[js/missing-token-validation] - False positive: custom double-submit CSRF pattern follows immediately
@@ -116,6 +133,15 @@ if (process.env.NODE_ENV === "development") {
     res.sendFile(path.join(publicDir, "index.html"));
   });
 }
+
+// Global error handler
+app.use((err: Error, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error("Unhandled server error", { error: err.message });
+  if (res.headersSent) {
+    return next(err);
+  }
+  res.status(500).json({ error: "internal_server_error" });
+});
 
 // Start server
 const port = parseInt(process.env.PORT || "5000", 10);

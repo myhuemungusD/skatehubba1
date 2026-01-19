@@ -3,7 +3,7 @@ description: 'Standardized pnpm + Node.js setup for SkateHubba monorepo'
 
 inputs:
   node-version:
-    description: 'Node.js version'
+    description: 'Node.js version (fallback if .nvmrc is missing)'
     required: false
     default: '20'
 
@@ -24,5 +24,6 @@ runs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
+        node-version-file: .nvmrc
         node-version: ${{ inputs.node-version }}
         cache: pnpm

@@ -1,16 +1,12 @@
 # 🛹 SkateHubba™
 
-> The ultimate skateboarding platform merging AR gameplay, social interaction, and skate culture.
+> The high-performance skateboarding platform: clips, battles, and real-world progression.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB.svg)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
 [![CI](https://github.com/myhuemungusD/skatehubba1/actions/workflows/ci.yml/badge.svg)](https://github.com/myhuemungusD/skatehubba1/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/Tests-133%20passing-brightgreen.svg)](./vitest.config.mts)
-[![Coverage](https://img.shields.io/badge/Coverage-3%25-red.svg)](./vitest.config.mts)
-[![CodeQL](https://github.com/myhuemungusD/skatehubba1/actions/workflows/codeql.yml/badge.svg)](https://github.com/myhuemungusD/skatehubba1/security/code-scanning)
-[![Security](https://img.shields.io/badge/Vulnerabilities-0-brightgreen.svg)](https://github.com/myhuemungusD/skatehubba1/security)
 
 **Owner:** Jason Hamilton  
 **Entity:** Design Mainline LLC  
@@ -18,103 +14,104 @@
 
 ---
 
-## Table of Contents 
+## Investor Snapshot
 
-- [What is SkateHubba](#what-is-skatehubba)
-- [Core Product Loop](#core-product-loop)
-- [Key Features](#key-features)
-- [Tech Stack](#tech-stack)
-- [Repo Structure](#repo-structure)
-- [Local Development](#local-development)
-- [Environment Separation](#environment-separation)
-- [Testing](#testing)
-- [Deployment](#deployment)
-- [Security](#security)
-- [Contributing](#contributing)
-- [License](#license)
-- [Trademark](#trademark)
+SkateHubba turns skateboarding into a measurable, viral sport with **real-world proof of progression**. We own the **skate graph** (spots, tricks, battles, outcomes) and convert it into retention loops, rankings, and monetizable creator moments.
+
+**Why now:** skate culture already lives on short video, but there’s no system of record for **who landed what, where, and when**. That’s the unlock.
+
+**Moat:** the data flywheel (spots + check-ins + battles + judging) compounds into reputation and regional dominance.
 
 ---
 
-## What is SkateHubba
+## MVP (What Ships First)
 
-SkateHubba is a skater-built platform that combines:
-- a **vertical clip feed** (skate-first, not generic social),
-- **remote Game of S.K.A.T.E. battles** with community judging,
-- **spot discovery + check-ins** for real-world progression,
-- and an **AR reward layer** (ghosts/replays anchored to places).
+- **Spot discovery + check-ins** for real-world progression.
+- **Trick library + mastery** for measurable skill growth.
+- **Battle-ready clips** with community validation.
 
-The long-term goal is to own the **skate graph**: tricks, spots, battles, judging outcomes, reputation, and crew influence.
+See `docs/PRODUCT_MVP.md` for the precise MVP boundary and metrics.【F:docs/PRODUCT_MVP.md†L1-L28】
 
 ---
 
-## Core Product Loop
+## Demo in 3 Minutes
 
-1. **Watch** clips (feed)
-2. **Battle** (remote S.K.A.T.E.)
-3. **Judge / vote** (community validation)
-4. **Check in** at spots (streaks + rep)
-5. **Share/export** clips (growth engine)
-6. Repeat
+1. `pnpm install`
+2. Set `DATABASE_URL` in `.env` (see `.env.example`).
+3. `pnpm tsx scripts/seed-demo.ts`
+4. `pnpm start`
 
 ---
 
-## Key Features
+## Architecture & Data
 
-- **Remote Game of S.K.A.T.E.**
-  - 1v1 battles, play-by-play, reply windows
-  - vote/judging mechanics
-
-- **Spot Map + Check-ins**
-  - location-based check-in validation
-  - streaks, leaderboards, city rankings
-
-- **AR / Trick “Ghosts”**
-  - an aspirational reward layer (not required for onboarding)
-  - designed to be vendor-agnostic
-
-- **AI Skate Buddy (“Hesher”)**
-  - skate-specific Q&A and coaching direction (evolves over time)
-
-- **Identity + Profile**
-  - skater profile, credibility, future “verified” paths
-
-- **E-commerce (planned)**
-  - culture-aligned drops/collabs and shop discovery
+- `docs/ARCHITECTURE.md` — system layout and data flow.【F:docs/ARCHITECTURE.md†L1-L29】
+- `docs/DATA_MODEL.md` — Spot, CheckIn, Trick, User, Media schemas.【F:docs/DATA_MODEL.md†L1-L45】
+- `docs/DEPLOYMENT.md` — deployment runbook.
 
 ---
 
-## Tech Stack
+## Security & Abuse Controls
 
-- **Web:** React + Vite + TypeScript
-- **Backend:** Node / Express (plus real-time infra where applicable)
-- **Auth:** Firebase Auth
-- **Profiles / realtime:** Firestore
-- **Structured data:** PostgreSQL + Drizzle
-- **Storage:** Firebase Storage (media uploads)
-- **CI/Security:** GitHub Actions + CodeQL
+- No secrets in repo; CI secret scan enforced.
+- Firebase rules versioned and tested.
+- Rate limits, write quotas, and ban list guards.
+
+See `docs/SECURITY.md` for policy details.【F:docs/SECURITY.md†L1-L27】
 
 ---
 
-## Repo Structure
+## Roadmap Discipline
 
-> Exact folders may evolve, but the intent is consistent:
+We run issues with three labels for speed and investor clarity:
 
-- `client/` — web app (Vite/React)
-- `server/` — API + services
-- `packages/` — shared code (types, config, utilities)
-  - `@skatehubba/config` — universal env loader + guardrails
+- **MVP** (must ship)
+- **v1** (post-MVP growth)
+- **vNext** (long-horizon bets)
+
+---
+
+## Release Notes
+
+All releases are summarized in `docs/CHANGELOG.md` (tagged on deploy).
 
 ---
 
 ## Local Development
 
 ### Prerequisites
-- Node.js **20+**
-- pnpm
 
-### Install
-From repo root:
+- Node **20.11.1** (see `.nvmrc`)
+- pnpm **10.0.0**
+
+### Install & Run
 
 ```bash
 pnpm install
+pnpm dev
+```
+
+### CI Gate (required for merge)
+
+```bash
+pnpm -w run verify
+```
+
+---
+
+## Repo Structure
+
+- `client/` — web app (React/Vite)
+- `server/` — API + services
+- `shared/` — shared schemas and types
+- `docs/` — architecture, security, MVP, deployment
+
+---
+
+## Contributing
+
+See `CONTRIBUTING.md`. Contributions require tests and the verify gate.
+
+## License
+
+MIT (see `LICENSE`).

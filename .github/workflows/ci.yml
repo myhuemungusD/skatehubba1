@@ -33,14 +33,8 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm run typecheck
-
-      - name: Lint
-        run: pnpm run lint
-
-      - name: Build
-        run: pnpm run build
+      - name: Verify (typecheck + lint + build)
+        run: pnpm -w run verify
 
       - name: Test with Coverage
         run: pnpm vitest run --coverage
@@ -75,13 +69,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Block insecure Firestore/Storage rules
-        run: |
-          bad=0
-          for f in firestore.rules storage.rules; do
-            if [ -f "$f" ] && grep -nE "allow\s+read,\s*write:\s*if\s*true" "$f"; then
-              echo "::error file=$f::Found insecure wildcard access in $f"
-              bad=1
-            fi
-          done
-          if [ $bad -eq 1 ]; then exit 1; fi
+      - name: Verify Firebase rules are present and safe
+        run: node scripts/verify-firebase-rules.mjs
+
+  secret_scan:
+    name: "No Secrets in Repo"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

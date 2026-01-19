@@ -28,13 +28,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // 3. Metrics Routes (Admin only, for dashboard)
   app.use("/api/metrics", metricsRouter);
 
+  const parseDelimitedEnv = (value: string | undefined) =>
+    new Set(
+      (value ?? "")
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+    );
+
+  const bannedIps = parseDelimitedEnv(process.env.BANNED_IPS);
+  const bannedUserIds = parseDelimitedEnv(process.env.BANNED_USER_IDS);
+
+  const WRITE_QUOTA_LIMIT = Number(process.env.WRITE_QUOTA_MAX ?? "50");
+  const WRITE_QUOTA_WINDOW_MS = Number(process.env.WRITE_QUOTA_WINDOW_MS ?? 24 * 60 * 60 * 1000);
+  const writeQuotaLedger = new Map<string, { count: number; resetAt: number }>();
+
+  const getClientIp = (req: Request): string | null => {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (typeof forwarded === "string" && forwarded.trim()) {
+      return forwarded.split(",")[0]?.trim() || null;
+    }
+    if (Array.isArray(forwarded) && forwarded.length > 0) {
+      return forwarded[0]?.trim() || null;
+    }
+    const realIp = req.headers["x-real-ip"];
+    if (typeof realIp === "string" && realIp.trim()) {
+      return realIp.trim();
+    }
+    if (Array.isArray(realIp) && realIp.length > 0) {
+      return realIp[0]?.trim() || null;
+    }
+    return req.ip || null;
+  };
+
+  const enforceBanList = (req: Request) => {
+    const ip = getClientIp(req);
+    const userId = req.currentUser?.id;
+
+    if (ip && bannedIps.has(ip)) {
+      return { blocked: true, reason: "IP_BANNED" };
+    }
+    if (userId && bannedUserIds.has(userId)) {
+      return { blocked: true, reason: "USER_BANNED" };
+    }
+    return { blocked: false };
+  };
+
+  const enforceWriteQuota = (req: Request) => {
+    const key = req.currentUser?.id ?? getClientIp(req) ?? "unknown";
+    const now = Date.now();
+    const existing = writeQuotaLedger.get(key);
+
+    if (!existing || existing.resetAt <= now) {
+      writeQuotaLedger.set(key, { count: 1, resetAt: now + WRITE_QUOTA_WINDOW_MS });
+      return { allowed: true };
+    }
+
+    if (existing.count >= WRITE_QUOTA_LIMIT) {
+      return { allowed: false, resetAt: existing.resetAt };
+    }
+
+    existing.count += 1;
+    writeQuotaLedger.set(key, existing);
+    return { allowed: true };
+  };
+
+  const spotListQuerySchema = z
+    .object({
+      city: z.string().optional(),
+      spotType: z.string().optional(),
+      tier: z.string().optional(),
+      createdBy: z.string().optional(),
+      verified: z.coerce.boolean().optional(),
+      limit: z.coerce.number().int().min(1).max(100).optional(),
+      offset: z.coerce.number().int().min(0).optional(),
+    })
+    .strict();
+
+  const normalizeQuery = (query: Request["query"]) =>
+    Object.fromEntries(
+      Object.entries(query).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value])
+    );
+
   // 4. Spot Endpoints
-  app.get("/api/spots", async (_req, res) => {
-    const spots = await spotStorage.getAllSpots();
+  app.get("/api/spots", async (req, res) => {
+    const parsed = spotListQuerySchema.safeParse(normalizeQuery(req.query));
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid query", issues: parsed.error.flatten() });
+    }
+    const spots = await spotStorage.getAllSpots(parsed.data);
     res.json(spots);
   });
 
   app.post("/api/spots", publicWriteLimiter, requireCsrfToken, async (req, res) => {
+    const banStatus = enforceBanList(req);
+    if (banStatus.blocked) {
+      return res.status(403).json({ message: banStatus.reason });
+    }
+
+    const quotaStatus = enforceWriteQuota(req);
+    if (!quotaStatus.allowed) {
+      return res.status(429).json({ message: "WRITE_QUOTA_EXCEEDED" });
+    }
+
     // Basic Auth Check: Ensure we have a user ID to bind the spot to
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "You must be logged in to create a spot" });
@@ -62,6 +158,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/spots/check-in", authenticateUser, async (req, res) => {
+    const banStatus = enforceBanList(req);
+    if (banStatus.blocked) {
+      return res.status(403).json({ message: banStatus.reason });
+    }
+
+    const quotaStatus = enforceWriteQuota(req);
+    if (!quotaStatus.allowed) {
+      return res.status(429).json({ message: "WRITE_QUOTA_EXCEEDED" });
+    }
+
     const parsed = checkInSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ message: "Invalid request", issues: parsed.error.flatten() });
@@ -90,24 +196,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const getClientIp = (req: Request): string | null => {
-    const forwarded = req.headers["x-forwarded-for"];
-    if (typeof forwarded === "string" && forwarded.trim()) {
-      return forwarded.split(",")[0]?.trim() || null;
-    }
-    if (Array.isArray(forwarded) && forwarded.length > 0) {
-      return forwarded[0]?.trim() || null;
-    }
-    const realIp = req.headers["x-real-ip"];
-    if (typeof realIp === "string" && realIp.trim()) {
-      return realIp.trim();
-    }
-    if (Array.isArray(realIp) && realIp.length > 0) {
-      return realIp[0]?.trim() || null;
-    }
-    return req.ip || null;
-  };
-
   const hashIp = (ip: string, salt: string) =>
     crypto.createHash("sha256").update(`${ip}:${salt}`).digest("hex");
 
@@ -117,6 +205,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     value instanceof admin.firestore.Timestamp ? value.toMillis() : null;
 
   app.post("/api/beta-signup", async (req, res) => {
+    const banStatus = enforceBanList(req);
+    if (banStatus.blocked) {
+      return res.status(403).json({ ok: false, error: banStatus.reason });
+    }
+
+    const quotaStatus = enforceWriteQuota(req);
+    if (!quotaStatus.allowed) {
+      return res.status(429).json({ ok: false, error: "WRITE_QUOTA_EXCEEDED" });
+    }
+
     const parsed = BetaSignupInput.safeParse(req.body);
     if (!parsed.success) {
       return res

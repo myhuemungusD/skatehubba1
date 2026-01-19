@@ -75,6 +75,12 @@ functions/
 npm run build
 ```
 
+### Pre-deploy check (required)
+
+```bash
+pnpm -w run verify
+```
+
 ### Deploy Firebase Functions manually
 
 ```bash
