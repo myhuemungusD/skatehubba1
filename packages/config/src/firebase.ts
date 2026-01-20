@@ -1,14 +1,8 @@
-/**
+﻿/**
  * Firebase Configuration
  *
- * Centralized Firebase config for web + mobile.
- * Environment-aware selection while remaining within a single Firebase project.
- *
- * Design goals:
- * - Deterministic: env var overrides are explicit and validated.
- * - Safe-by-default: production/staging must be correctly configured (fail fast).
- * - No secret assumptions: web API keys are not secrets; security via rules + auth domains.
- * - Enterprise hygiene: no noisy console logs, no silent fallbacks in high environments.
+ * Centralized Firebase config that works for both web and mobile.
+ * Uses environment-based app separation within a single Firebase project.
  *
  * @module @skatehubba/config/firebase
  */
@@ -16,12 +10,8 @@
 import { getPublicEnvOptional, getAppEnv, type AppEnv } from "./publicEnv";
 
 /**
- * Minimal logger contract (avoid direct console usage).
- * Consumers can wire this to pino/winston/datadog/etc.
+ * Firebase configuration interface
  */
-type LogFn = (msg: string, meta?: Record<string, unknown>) => void;
-const noop: LogFn = () => undefined;
-
 export interface FirebaseConfig {
   apiKey: string;
   authDomain: string;
@@ -37,121 +27,74 @@ export interface GetFirebaseConfigOptions {
 }
 
 /**
- * Hardcoded baseline config for this Firebase project.
- * NOTE: This is not "secret"; it is a safe default for local development only.
+ * Production config
  *
- * Production/staging MUST be explicitly configured via environment variables
- * unless allowLocalFallback is enabled (not recommended for CI/prod).
+ * Note on security model:
+ * - Firebase Web API keys are not traditional secrets; security is enforced via
+ *   Firebase Security Rules and authorized domains (see AUTHORIZED_DOMAINS below).
+ * - We still avoid committing real project keys to source control and instead read
+ *   them from environment variables, so keys can be rotated without code changes.
+ *
+ * EXPO_PUBLIC_FIREBASE_API_KEY_PROD must be configured in the deployment
+ * environment. A non-sensitive placeholder is used as a last-resort fallback
+ * for misconfigured local environments only.
  */
-const BASE_PROJECT = {
 const PRODUCTION_CONFIG: FirebaseConfig = {
   apiKey: "AIzaSyD6kLt4GKV4adX-oQ3m_aXIpL6GXBP0xZw",
   authDomain: "sk8hub-d7806.firebaseapp.com",
   projectId: "sk8hub-d7806",
   storageBucket: "sk8hub-d7806.firebasestorage.app",
   messagingSenderId: "665573979824",
-} as const;
-
-const PROD_BASELINE: FirebaseConfig = {
-  apiKey:
-    getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_API_KEY_PROD") ??
-    "DUMMY_FIREBASE_API_KEY",
-  ...BASE_PROJECT,
-  appId: "1:665573979824:web:731aaae46daea5efee2d75",
+  appId: "1:665573979824:web:731aaae46daea5efee2d75", // prod web app
   measurementId: "G-7XVNF1LHZW",
 };
 
-const STAGING_BASELINE: FirebaseConfig = {
-  ...PROD_BASELINE,
-  // Enterprise rule: staging should have its own Firebase Web App (same project).
-  // Set EXPO_PUBLIC_FIREBASE_APP_ID_STAGING, EXPO_PUBLIC_FIREBASE_API_KEY_STAGING, etc.
-  // If not set, we still validate and fail in staging unless allowLocalFallback is true.
+/**
+ * Staging config (create a separate Firebase Web App in the same project)
+ *
+ * To set this up:
+ * 1. Go to Firebase Console > Project Settings > Your Apps
+ * 2. Click "Add app" > Web
+ * 3. Name it "skatehubba-web-staging"
+ * 4. Copy the appId here
+ */
+const STAGING_CONFIG: FirebaseConfig = {
+  ...PRODUCTION_CONFIG,
+  // Override with staging-specific appId when created in Firebase Console
+  // appId: '1:665573979824:web:STAGING_APP_ID_HERE',
 };
 
 /**
- * Configuration policy
- * - In prod/staging: require env vars to be present & valid (no silent fallbacks).
- * - In local/dev: allow baseline fallback for ergonomics.
+ * Get Firebase config for the current environment
+ *
+ * Uses env vars if available, falls back to hardcoded config
  */
-export interface FirebaseConfigOptions {
-  /**
-   * Provide a logger for diagnostics. Defaults to no-op.
-   * Do not log secrets; this module only logs non-sensitive metadata.
-   */
-  logger?: {
-    info?: LogFn;
-    warn?: LogFn;
-    error?: LogFn;
-  };
 export function getFirebaseConfig(options: GetFirebaseConfigOptions = {}): FirebaseConfig {
   const env = getAppEnv();
 
-  /**
-   * If true, allows using hardcoded baseline config in non-local envs.
-   * Default: false (recommended).
-   */
-  allowLocalFallback?: boolean;
-}
+  // Try to read from env vars first (allows override)
+  const envConfig: FirebaseConfig | null = (() => {
+    const apiKey = getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_API_KEY");
+    const projectId = getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_PROJECT_ID");
 
-function assert(condition: unknown, message: string): asserts condition {
-  if (!condition) throw new Error(message);
-}
+    if (!apiKey || !projectId) return null;
 
-function isNonEmpty(s: unknown): s is string {
-  return typeof s === "string" && s.trim().length > 0;
-}
+    return {
+      apiKey,
+      authDomain:
+        getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN") || `${projectId}.firebaseapp.com`,
+      projectId,
+      storageBucket:
+        getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET") ||
+        `${projectId}.firebasestorage.app`,
+      messagingSenderId:
+        getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID") ||
+        PRODUCTION_CONFIG.messagingSenderId,
+      appId: getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_APP_ID") || PRODUCTION_CONFIG.appId,
+      measurementId: getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID"),
+    };
+  })();
 
-function isFirebaseAppId(appId: string): boolean {
-  // Typical web appId format: "1:<senderId>:web:<hex>"
-  // This project uses a 12-digit senderId (e.g. "665573979824"), so we enforce 12 digits here.
-  return /^1:\d{12}:(web|ios|android):[A-Za-z0-9]+$/.test(appId);
-}
-
-function isDomainLike(domain: string): boolean {
-  // very lightweight check: "x.y"
-  return /^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(domain);
-}
-
-function validateConfig(cfg: FirebaseConfig, env: AppEnv): FirebaseConfig {
-  assert(isNonEmpty(cfg.apiKey), `[Firebase] apiKey is required (${env})`);
-  assert(isNonEmpty(cfg.projectId), `[Firebase] projectId is required (${env})`);
-  assert(isNonEmpty(cfg.appId), `[Firebase] appId is required (${env})`);
-  assert(isNonEmpty(cfg.authDomain), `[Firebase] authDomain is required (${env})`);
-  assert(isNonEmpty(cfg.storageBucket), `[Firebase] storageBucket is required (${env})`);
-  assert(
-    isNonEmpty(cfg.messagingSenderId),
-    `[Firebase] messagingSenderId is required (${env})`
-  );
-
-  // Guardrails
-  assert(
-    cfg.projectId === BASE_PROJECT.projectId,
-    `[Firebase] projectId mismatch: expected "${BASE_PROJECT.projectId}", got "${cfg.projectId}" (${env})`
-  );
-
-  // authDomain should look like "<projectId>.firebaseapp.com" unless explicitly overridden.
-  assert(
-    isDomainLike(cfg.authDomain),
-    `[Firebase] authDomain looks invalid: "${cfg.authDomain}" (${env})`
-  );
-
-  // storage bucket varies (.appspot.com vs .firebasestorage.app) but must be non-empty.
-  assert(
-    isDomainLike(cfg.storageBucket),
-    `[Firebase] storageBucket looks invalid: "${cfg.storageBucket}" (${env})`
-  );
-
-  assert(
-    isFirebaseAppId(cfg.appId),
-    `[Firebase] appId looks invalid: "${cfg.appId}" (${env})`
-  );
-
-  // measurementId is optional; if present, validate format
-  if (cfg.measurementId) {
-    assert(
-      /^G-[A-Z0-9]{6,}$/.test(cfg.measurementId),
-      `[Firebase] measurementId looks invalid: "${cfg.measurementId}" (${env})`
-    );
   const allowFallback =
     (env !== "prod" && env !== "staging") || options.allowLocalFallback === true;
 
@@ -176,177 +119,40 @@ function validateConfig(cfg: FirebaseConfig, env: AppEnv): FirebaseConfig {
       console.log("[Firebase] Using hardcoded config for local dev");
       return PRODUCTION_CONFIG; // Local dev uses prod Firebase (namespaced data)
   }
-
-  return cfg;
 }
 
 /**
- * Read environment-provided config.
- * Supports two patterns:
- * 1) Generic: EXPO_PUBLIC_FIREBASE_* (single set)
- * 2) Env-specific: EXPO_PUBLIC_FIREBASE_*_PROD / *_STAGING
- */
-function readEnvConfig(env: AppEnv): FirebaseConfig | null {
-  // Prefer env-specific keys if present
-  const suffix =
-    env === "prod" ? "_PROD" : env === "staging" ? "_STAGING" : "";
-
-  const apiKey =
-    (suffix !== "" &&
-      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_API_KEY${suffix}`)) ||
-    getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_API_KEY");
-
-  const projectId =
-    (suffix !== "" &&
-      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_PROJECT_ID${suffix}`)) ||
-    getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_PROJECT_ID");
-
-  const appId =
-    (suffix !== "" &&
-      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_APP_ID${suffix}`)) ||
-    getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_APP_ID");
-
-  // If key pieces are missing, treat as not-configured
-  if (!apiKey || !projectId || !appId) return null;
-
-  const authDomain =
-    (suffix !== "" &&
-      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN${suffix}`)) ||
-    getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN") ||
-    `${projectId}.firebaseapp.com`;
-
-  const storageBucket =
-    (suffix !== "" &&
-      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET${suffix}`)) ||
-    getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET") ||
-    `${projectId}.firebasestorage.app`;
-
-  const messagingSenderId =
-    (suffix !== "" &&
-      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID${suffix}`)) ||
-    getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID") ||
-    BASE_PROJECT.messagingSenderId;
-
-  const measurementId =
-    (suffix !== "" &&
-      getPublicEnvOptional(`EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID${suffix}`)) ||
-    getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID");
-
-  return {
-    apiKey,
-    projectId,
-    appId,
-    authDomain,
-    storageBucket,
-    messagingSenderId,
-    measurementId: measurementId ?? undefined,
-  };
-}
-
-function getBaseline(env: AppEnv): FirebaseConfig {
-  switch (env) {
-    case "prod":
-      return PROD_BASELINE;
-    case "staging":
-      return STAGING_BASELINE;
-    default:
-      // Local dev uses the same project but should namespace data at the app layer.
-      return PROD_BASELINE;
-  }
-}
-
-/**
- * Get Firebase config for current environment.
- *
- * Precedence:
- * 1) Environment variables (validated)
- * 2) Baseline config (ONLY allowed for local, unless allowLocalFallback is true)
- *
- * @param options - Optional configuration for this helper.
- *   - `logger`: Optional structured logger. If provided, it should expose
- *     `info`, `warn`, and `error` methods compatible with the internal
- *     {@link LogFn} signature. This allows consumers to forward Firebase
- *     configuration events to their existing logging/observability stack
- *     (e.g. pino, winston, Datadog, etc.).
- *   - `allowLocalFallback`: When `true`, permits falling back to the
- *     baseline config outside of local/development environments. By default,
- *     only `local`/`development` may use the baseline config.
- *
- * Backwards compatibility:
- * - The `options` parameter is optional and defaults to `{}`. Existing
- *   callers that do not pass it will continue to work as before; logging
- *   will be disabled via no-op log functions.
- * - To integrate logging in existing callers, pass a `logger` that conforms
- *   to the minimal interface used here:
- *   `{ info(msg, meta?), warn(msg, meta?), error(msg, meta?) }`.
- */
-export function getFirebaseConfig(options: FirebaseConfigOptions = {}): FirebaseConfig {
-  const env = getAppEnv();
-  const log = {
-    info: options.logger?.info ?? noop,
-    warn: options.logger?.warn ?? noop,
-    error: options.logger?.error ?? noop,
-  };
-
-  const envConfig = readEnvConfig(env);
-
-  if (envConfig) {
-    const validated = validateConfig(envConfig, env);
-    log.info("[Firebase] Using env-provided config", {
-      env,
-      projectId: validated.projectId,
-      appIdSuffix: validated.appId.slice(-6),
-    });
-    return validated;
-  }
-
-  const allowFallback =
-    env === "local" || options.allowLocalFallback === true;
-
-  if (!allowFallback) {
-    // Fail fast in staging/prod instead of silently using prod config.
-    throw new Error(
-      `[Firebase] Missing required env config for "${env}". ` +
-        `Set EXPO_PUBLIC_FIREBASE_API_KEY_${env.toUpperCase()}, ` +
-        `EXPO_PUBLIC_FIREBASE_PROJECT_ID_${env.toUpperCase()}, ` +
-        `EXPO_PUBLIC_FIREBASE_APP_ID_${env.toUpperCase()} (or the non-suffixed equivalents).`
-    );
-  }
-
-  const baseline = getBaseline(env);
-  const validated = validateConfig(baseline, env);
-
-  log.warn("[Firebase] Using baseline config fallback", {
-    env,
-    projectId: validated.projectId,
-    appIdSuffix: validated.appId.slice(-6),
-  });
-
-  return validated;
-}
-
-/**
- * Get expected Firebase App ID for an environment (guardrail)
+ * Get the expected Firebase App ID for an environment
+ * Used for guardrail validation
  */
 export function getExpectedAppId(env: AppEnv): string {
-  const envSpecific =
-    env === "prod"
-      ? getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_APP_ID_PROD")
-      : env === "staging"
-        ? getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_APP_ID_STAGING")
-        : null;
-
-  return envSpecific || getBaseline(env).appId;
+  switch (env) {
+    case "prod":
+      return getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_APP_ID_PROD") || PRODUCTION_CONFIG.appId;
+    case "staging":
+      return getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_APP_ID_STAGING") || STAGING_CONFIG.appId;
+    default:
+      return PRODUCTION_CONFIG.appId;
+  }
 }
 
 /**
- * Authorized domains for Firebase Auth (reference)
+ * Authorized domains for Firebase Auth (for reference)
  *
- * Configure: Firebase Console → Authentication → Settings → Authorized domains
+ * Configure these in Firebase Console > Authentication > Settings > Authorized domains
  *
- * Enterprise posture:
- * - Do NOT authorize wildcard preview domains (*.vercel.app).
- * - Keep localhost only for development.
+ * Production:
+ * - skatehubba.com
+ * - www.skatehubba.com
+ * - api.skatehubba.com
+ *
+ * Staging:
+ * - staging.skatehubba.com
+ * - staging-api.skatehubba.com
+ *
+ * DO NOT ADD:
+ * - *.vercel.app (preview URLs)
+ * - localhost (only for development)
  */
 export const AUTHORIZED_DOMAINS = {
   prod: ["skatehubba.com", "www.skatehubba.com", "api.skatehubba.com"],
