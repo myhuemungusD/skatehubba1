@@ -184,10 +184,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 3. User Search and Browse Endpoints
   app.get("/api/users/search", authenticateUser, async (req, res) => {
-    const query = req.query.q as string;
-    if (!query || query.length < 2) {
+    const queryParam = req.query.q;
+    // Validate query parameter is a string (prevent array injection)
+    if (typeof queryParam !== "string" || queryParam.length < 2) {
       return res.json([]);
     }
+    const query = queryParam;
 
     if (!isDatabaseAvailable()) {
       return res.json([]);
@@ -293,8 +295,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Select random opponent
-      const randomIndex = Math.floor(Math.random() * eligibleOpponents.length);
+      // Select random opponent using cryptographically secure random
+      const randomBytes = crypto.randomBytes(4);
+      const randomIndex = randomBytes.readUInt32BE(0) % eligibleOpponents.length;
       const opponent = eligibleOpponents[randomIndex];
 
       // In production, you would create a challenge record here
