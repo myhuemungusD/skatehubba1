@@ -57,144 +57,146 @@ type MockCounter = {
   updatedAt: Date;
 };
 
-const createMockDb = () => {
-  let checkInsData: MockCheckIn[] = [];
-  let usersData: MockUser[] = [];
-  let profilesData: MockProfile[] = [];
-  let requestsData: MockFilmerRequest[] = [];
-  let countersData: MockCounter[] = [];
+const { mockDb } = vi.hoisted(() => {
+  const createMockDb = () => {
+    let checkInsData: MockCheckIn[] = [];
+    let usersData: MockUser[] = [];
+    let profilesData: MockProfile[] = [];
+    let requestsData: MockFilmerRequest[] = [];
+    let countersData: MockCounter[] = [];
 
-  const select = vi.fn(() => ({
-    from: vi.fn((table: unknown) => ({
-      where: vi.fn(() => ({
-        limit: vi.fn(async () => {
-          if (table === checkIns) {
-            return checkInsData.slice(0, 1);
-          }
-          if (table === customUsers) {
-            return usersData.slice(0, 1);
-          }
-          if (table === userProfiles) {
-            return profilesData.slice(0, 1);
-          }
-          if (table === filmerRequests) {
-            return requestsData.slice(0, 1);
-          }
-          if (table === filmerDailyCounters) {
-            return countersData.slice(0, 1);
-          }
-          return [];
-        }),
-      })),
-      orderBy: vi.fn(() => ({
-        limit: vi.fn(async () => {
-          if (table === filmerRequests) {
-            return requestsData.slice(0, 1);
-          }
-          return [];
-        }),
-      })),
-      limit: vi.fn(async () => {
-        if (table === filmerRequests) {
-          return requestsData.slice(0, 1);
-        }
-        return [];
-      }),
-    })),
-  }));
-
-  const insert = vi.fn((table: unknown) => ({
-    values: vi.fn(async (payload: Record<string, unknown>) => {
-      if (table === filmerRequests) {
-        requestsData = [payload as MockFilmerRequest];
-      }
-      if (table === filmerDailyCounters) {
-        countersData = [payload as MockCounter];
-      }
-      return [];
-    }),
-  }));
-
-  const update = vi.fn((table: unknown) => ({
-    set: vi.fn((changes: Record<string, unknown>) => ({
-      where: vi.fn(() => {
-        if (table === checkIns && checkInsData.length > 0) {
-          checkInsData = [{ ...checkInsData[0], ...changes }];
-        }
-        if (table === filmerRequests && requestsData.length > 0) {
-          requestsData = [{ ...requestsData[0], ...changes }];
-        }
-        if (table === filmerDailyCounters && countersData.length > 0) {
-          countersData = [{ ...countersData[0], ...changes }];
-        }
-        return {
-          returning: vi.fn(async () => {
-            if (table === checkIns && checkInsData.length > 0) {
-              return [{ id: checkInsData[0].id }];
+    const select = vi.fn(() => ({
+      from: vi.fn((table: unknown) => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(async () => {
+            if (table === checkIns) {
+              return checkInsData.slice(0, 1);
             }
-            if (table === filmerRequests && requestsData.length > 0) {
-              return [{ id: requestsData[0].id }];
+            if (table === customUsers) {
+              return usersData.slice(0, 1);
             }
-            if (table === filmerDailyCounters && countersData.length > 0) {
-              return [{ key: countersData[0].counterKey }];
+            if (table === userProfiles) {
+              return profilesData.slice(0, 1);
+            }
+            if (table === filmerRequests) {
+              return requestsData.slice(0, 1);
+            }
+            if (table === filmerDailyCounters) {
+              return countersData.slice(0, 1);
             }
             return [];
           }),
-        };
+        })),
+        orderBy: vi.fn(() => ({
+          limit: vi.fn(async () => {
+            if (table === filmerRequests) {
+              return requestsData.slice(0, 1);
+            }
+            return [];
+          }),
+        })),
+        limit: vi.fn(async () => {
+          if (table === filmerRequests) {
+            return requestsData.slice(0, 1);
+          }
+          return [];
+        }),
+      })),
+    }));
+
+    const insert = vi.fn((table: unknown) => ({
+      values: vi.fn(async (payload: Record<string, unknown>) => {
+        if (table === filmerRequests) {
+          requestsData = [payload as MockFilmerRequest];
+        }
+        if (table === filmerDailyCounters) {
+          countersData = [payload as MockCounter];
+        }
+        return [];
       }),
-    })),
-  }));
+    }));
 
-  const deleteFn = vi.fn((table: unknown) => ({
-    where: vi.fn(() => {
-      if (table === filmerDailyCounters) {
-        countersData = countersData.filter((counter) => counter.day >= "2000-01-01");
-      }
-      return [];
-    }),
-  }));
+    const update = vi.fn((table: unknown) => ({
+      set: vi.fn((changes: Record<string, unknown>) => ({
+        where: vi.fn(() => {
+          if (table === checkIns && checkInsData.length > 0) {
+            checkInsData = [{ ...checkInsData[0], ...changes }];
+          }
+          if (table === filmerRequests && requestsData.length > 0) {
+            requestsData = [{ ...requestsData[0], ...changes }];
+          }
+          if (table === filmerDailyCounters && countersData.length > 0) {
+            countersData = [{ ...countersData[0], ...changes }];
+          }
+          return {
+            returning: vi.fn(async () => {
+              if (table === checkIns && checkInsData.length > 0) {
+                return [{ id: checkInsData[0].id }];
+              }
+              if (table === filmerRequests && requestsData.length > 0) {
+                return [{ id: requestsData[0].id }];
+              }
+              if (table === filmerDailyCounters && countersData.length > 0) {
+                return [{ key: countersData[0].counterKey }];
+              }
+              return [];
+            }),
+          };
+        }),
+      })),
+    }));
 
-  const transaction = vi.fn(async (fn: (tx: unknown) => Promise<void>) => {
-    await fn({ select, insert, update });
-  });
+    const deleteFn = vi.fn((table: unknown) => ({
+      where: vi.fn(() => {
+        if (table === filmerDailyCounters) {
+          countersData = countersData.filter((counter) => counter.day >= "2000-01-01");
+        }
+        return [];
+      }),
+    }));
+
+    const transaction = vi.fn(async (fn: (tx: unknown) => Promise<void>) => {
+      await fn({ select, insert, update });
+    });
+
+    return {
+      select,
+      insert,
+      update,
+      delete: deleteFn,
+      transaction,
+      setCheckIns: (data: MockCheckIn[]) => {
+        checkInsData = data;
+      },
+      setUsers: (data: MockUser[]) => {
+        usersData = data;
+      },
+      setProfiles: (data: MockProfile[]) => {
+        profilesData = data;
+      },
+      setRequests: (data: MockFilmerRequest[]) => {
+        requestsData = data;
+      },
+      setCounters: (data: MockCounter[]) => {
+        countersData = data;
+      },
+      getCheckIns: () => checkInsData,
+      getRequests: () => requestsData,
+      getCounters: () => countersData,
+      reset: () => {
+        checkInsData = [];
+        usersData = [];
+        profilesData = [];
+        requestsData = [];
+        countersData = [];
+      },
+    };
+  };
 
   return {
-    select,
-    insert,
-    update,
-    delete: deleteFn,
-    transaction,
-    setCheckIns: (data: MockCheckIn[]) => {
-      checkInsData = data;
-    },
-    setUsers: (data: MockUser[]) => {
-      usersData = data;
-    },
-    setProfiles: (data: MockProfile[]) => {
-      profilesData = data;
-    },
-    setRequests: (data: MockFilmerRequest[]) => {
-      requestsData = data;
-    },
-    setCounters: (data: MockCounter[]) => {
-      countersData = data;
-    },
-    getCheckIns: () => checkInsData,
-    getRequests: () => requestsData,
-    getCounters: () => countersData,
-    reset: () => {
-      checkInsData = [];
-      usersData = [];
-      profilesData = [];
-      requestsData = [];
-      countersData = [];
-    },
+    mockDb: createMockDb(),
   };
-};
-
-const { mockDb } = vi.hoisted(() => ({
-  mockDb: createMockDb(),
-}));
+});
 
 vi.mock("../db", () => ({
   getDb: () => mockDb,
