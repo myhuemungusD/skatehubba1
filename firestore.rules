@@ -116,6 +116,10 @@ service cloud.firestore {
     match /mod_actions/{actionId} {
       allow read, write: if false;
     }
+
+    match /moderation_quotas/{quotaId} {
+      allow read, write: if false;
+    }
     
     // =========================================================================
     // USER PROFILES - READ ONLY (Profile data lives in PostgreSQL)
