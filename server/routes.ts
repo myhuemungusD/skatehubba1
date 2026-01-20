@@ -3,8 +3,8 @@ import { createServer, type Server } from "http";
 import { setupAuthRoutes } from "./auth/routes";
 import { spotStorage } from "./storage/spots";
 import { getDb, isDatabaseAvailable } from "./db";
-import { customUsers, userProfiles, spots, games } from "@shared/schema";
-import { ilike, or, eq, count } from "drizzle-orm";
+import { customUsers, spots, games } from "@shared/schema";
+import { ilike, or, eq, count, sql } from "drizzle-orm";
 import { insertSpotSchema } from "@shared/schema";
 import { publicWriteLimiter } from "./middleware/security";
 import { requireCsrfToken } from "./middleware/csrf";
@@ -17,6 +17,8 @@ import { authenticateUser } from "./auth/middleware";
 import { verifyAndCheckIn } from "./services/spotService";
 import { analyticsRouter } from "./routes/analytics";
 import { metricsRouter } from "./routes/metrics";
+import { sendQuickMatchNotification } from "./services/notificationService";
+import logger from "./logger";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // 1. Setup Authentication (Passport session)
@@ -180,7 +182,162 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 3. Public Stats Endpoint (for landing page)
+  // 3. User Search and Browse Endpoints
+  app.get("/api/users/search", authenticateUser, async (req, res) => {
+    const queryParam = req.query.q;
+    // Validate query parameter is a string (prevent array injection)
+    if (typeof queryParam !== "string" || queryParam.length < 2) {
+      return res.json([]);
+    }
+    const query = queryParam;
+
+    if (!isDatabaseAvailable()) {
+      return res.json([]);
+    }
+
+    try {
+      const database = getDb();
+      const searchTerm = `%${query}%`;
+      const results = await database
+        .select({
+          id: customUsers.id,
+          firstName: customUsers.firstName,
+          lastName: customUsers.lastName,
+          email: customUsers.email,
+          firebaseUid: customUsers.firebaseUid,
+        })
+        .from(customUsers)
+        .where(
+          or(
+            ilike(customUsers.firstName, searchTerm),
+            ilike(customUsers.lastName, searchTerm),
+            ilike(customUsers.email, searchTerm)
+          )
+        )
+        .limit(20);
+
+      const mapped = results.map((u) => ({
+        id: u.id,
+        displayName:
+          u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.firstName || "Skater",
+        handle: `user${u.id.substring(0, 4)}`,
+        wins: 0,
+        losses: 0,
+      }));
+
+      res.json(mapped);
+    } catch (_error) {
+      res.json([]);
+    }
+  });
+
+  app.get("/api/users", authenticateUser, async (req, res) => {
+    if (!isDatabaseAvailable()) {
+      return res.json([]);
+    }
+
+    try {
+      const database = getDb();
+      const results = await database
+        .select({
+          uid: customUsers.firebaseUid,
+          email: customUsers.email,
+          displayName: customUsers.firstName,
+          photoURL: sql<string | null>`null`,
+        })
+        .from(customUsers)
+        .where(eq(customUsers.isActive, true))
+        .limit(100);
+
+      res.json(results);
+    } catch (_error) {
+      res.json([]);
+    }
+  });
+
+  // Quick Match Endpoint
+  app.post("/api/matchmaking/quick-match", authenticateUser, async (req, res) => {
+    const currentUserId = req.currentUser?.id;
+    const currentUserName = req.currentUser?.firstName || "Skater";
+
+    if (!currentUserId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    if (!isDatabaseAvailable()) {
+      return res.status(503).json({ error: "Service unavailable" });
+    }
+
+    try {
+      const database = getDb();
+
+      // Find an available opponent (exclude current user, select random user with push token)
+      const availableOpponents = await database
+        .select({
+          id: customUsers.id,
+          firebaseUid: customUsers.firebaseUid,
+          firstName: customUsers.firstName,
+          pushToken: customUsers.pushToken,
+        })
+        .from(customUsers)
+        .where(eq(customUsers.isActive, true))
+        .limit(50);
+
+      // Filter out current user and users without push tokens
+      const eligibleOpponents = availableOpponents.filter(
+        (u) => u.id !== currentUserId && u.pushToken
+      );
+
+      if (eligibleOpponents.length === 0) {
+        return res.status(404).json({
+          error: "No opponents available",
+          message: "No users found for quick match. Try again later.",
+        });
+      }
+
+      // Select random opponent using unbiased cryptographically secure random
+      // Use rejection sampling to avoid modulo bias
+      const maxRange = Math.floor(0xffffffff / eligibleOpponents.length) * eligibleOpponents.length;
+      let randomValue: number;
+      do {
+        const randomBytes = crypto.randomBytes(4);
+        randomValue = randomBytes.readUInt32BE(0);
+      } while (randomValue >= maxRange);
+
+      const randomIndex = randomValue % eligibleOpponents.length;
+      const opponent = eligibleOpponents[randomIndex];
+
+      // In production, you would create a challenge record here
+      // For now, we'll create a temporary challenge ID
+      const challengeId = `qm-${Date.now()}-${currentUserId}-${opponent.id}`;
+
+      // Send push notification to opponent
+      if (opponent.pushToken) {
+        await sendQuickMatchNotification(opponent.pushToken, currentUserName, challengeId);
+      }
+
+      logger.info("[Quick Match] Match found", {
+        requesterId: currentUserId,
+        opponentId: opponent.id,
+        challengeId,
+      });
+
+      res.json({
+        success: true,
+        match: {
+          opponentId: opponent.id,
+          opponentName: opponent.firstName || "Skater",
+          opponentFirebaseUid: opponent.firebaseUid,
+          challengeId,
+        },
+      });
+    } catch (error) {
+      logger.error("[Quick Match] Failed to find match", { error, userId: currentUserId });
+      res.status(500).json({ error: "Failed to find match" });
+    }
+  });
+
+  // 4. Public Stats Endpoint (for landing page)
   app.get("/api/stats", async (_req, res) => {
     try {
       if (!isDatabaseAvailable()) {
