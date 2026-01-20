@@ -13,6 +13,8 @@ import {
   publicWriteLimiter,
 } from "./middleware/security";
 import { requireCsrfToken } from "./middleware/csrf";
+import { enforceTrustAction } from "./middleware/trustSafety";
+import { z } from "zod";
 import crypto from "node:crypto";
 import type { z } from "zod";
 import { BetaSignupInput } from "@shared/validation/betaSignup";
@@ -26,6 +28,8 @@ import { validateBody } from "./middleware/validation";
 import { SpotCheckInSchema, type SpotCheckInRequest } from "@shared/validation/spotCheckIn";
 import { logAuditEvent } from "./services/auditLog";
 import { verifyReplayProtection } from "./services/replayProtection";
+import { moderationRouter } from "./routes/moderation";
+import { createPost } from "./services/moderationStore";
 import { sendQuickMatchNotification } from "./services/notificationService";
 import logger from "./logger";
 
@@ -38,6 +42,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 3. Metrics Routes (Admin only, for dashboard)
   app.use("/api/metrics", metricsRouter);
+
+  // 3b. Moderation Routes
+  app.use("/api", moderationRouter);
 
   // 4. Spot Endpoints
   app.get("/api/spots", async (_req, res) => {
@@ -76,6 +83,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lng: spot.lng,
         },
       });
+  app.post(
+    "/api/spots/check-in",
+    authenticateUser,
+    enforceTrustAction("checkin"),
+    async (req, res) => {
+      const parsed = checkInSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", issues: parsed.error.flatten() });
+      }
+
+      // authenticateUser guarantees req.currentUser is defined here (type narrowing)
+      const userId = req.currentUser!.id;
+
+      const { spotId, lat, lng } = parsed.data;
+
+      try {
+        const result = await verifyAndCheckIn(userId, spotId, lat, lng);
+        if (!result.success) {
+          return res.status(403).json({ message: result.message });
+        }
+
+        return res.status(200).json(result);
+      } catch (error) {
+        if (error instanceof Error && error.message === "Spot not found") {
+          return res.status(404).json({ message: "Spot not found" });
+        }
+
+        return res.status(500).json({ message: "Check-in failed" });
+      }
+    }
+  );
+
+  const postSchema = z.object({
+    mediaUrl: z.string().url().max(2000),
+    caption: z.string().max(300).optional(),
+    spotId: z.number().int().optional(),
+  });
+
+  app.post("/api/posts", authenticateUser, enforceTrustAction("post"), async (req, res) => {
+    const parsed = postSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Invalid request", issues: parsed.error.flatten() });
+    }
 
       res.status(201).json(spot);
     }
@@ -157,6 +207,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
+    const post = await createPost(userId, parsed.data);
+    return res.status(201).json({ postId: post.id });
+  });
 
   const getClientIp = (req: Request): string | null => {
     const forwarded = req.headers["x-forwarded-for"];
