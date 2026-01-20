@@ -50,9 +50,16 @@ const createFirestoreReplayStore = (): ReplayStore => ({
       const snapshot = await transaction.get(docRef);
       const data = snapshot.data();
       const existingExpiry = data?.expiresAt;
+      const existingActionHash = data?.actionHash;
 
       if (snapshot.exists && existingExpiry instanceof admin.firestore.Timestamp) {
         if (existingExpiry.toMillis() > now.toMillis()) {
+          // Nonce is still valid; ensure it is only ever used for the same action.
+          if (typeof existingActionHash === "string" && existingActionHash !== record.actionHash) {
+            // Nonce was previously bound to a different action, treat as replay attempt.
+            return "replay" as const;
+          }
+          // Even if the action matches, reusing the nonce is a replay.
           return "replay" as const;
         }
       }
