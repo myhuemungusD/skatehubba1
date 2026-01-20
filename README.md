@@ -191,6 +191,19 @@ pnpm test
 pnpm -w run verify
 ```
 
+### Lint Policy
+
+`pnpm -w run lint` fails on errors only; warnings are non-blocking until the codebase is fully cleaned.
+
+### Cypress E2E
+
+```bash
+pnpm --filter skatehubba-client dev -- --host 0.0.0.0 --port 3000
+pnpm --filter skatehubba-client exec cypress run
+```
+
+> Note: Cypress specs assume the web app is running on `http://localhost:3000` and Firebase emulators are configured when needed.
+
 ---
 
 ## Deployment

@@ -53,6 +53,7 @@ const PrivacyPage = lazy(() => import("./pages/privacy"));
 const TermsPage = lazy(() => import("./pages/terms"));
 const SpecsPage = lazy(() => import("./pages/specs"));
 const CheckinsPage = lazy(() => import("./pages/checkins"));
+const ProfileSetup = lazy(() => import("./pages/profile/ProfileSetup"));
 
 const PublicProfileView = lazy(() => import("./features/social/public-profile/PublicProfileView"));
 const BoltsShowcase = lazy(() => import("./features/social/bolts-showcase/BoltsShowcase"));
@@ -125,6 +126,28 @@ function DashboardCheckinsRoute(_props: { params: Params }) {
   );
 }
 
+function ProfileSetupRoute() {
+  const auth = useAuth();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!auth.isAuthenticated) {
+      setLocation("/auth", { replace: true });
+      return;
+    }
+
+    if (auth.profileStatus === "exists") {
+      setLocation("/dashboard", { replace: true });
+    }
+  }, [auth.isAuthenticated, auth.profileStatus, setLocation]);
+
+  if (auth.loading || auth.profileStatus === "unknown") {
+    return <LoadingScreen />;
+  }
+
+  return <ProfileSetup />;
+}
+
 function AppRoutes() {
   return (
     <Suspense fallback={<LoadingScreen />}>
@@ -156,7 +179,9 @@ function AppRoutes() {
         <Route path="/skater/:handle" component={SkaterProfilePage} />
         <Route path="/p/:username" component={PublicProfileView} />
         <Route path="/showcase" component={BoltsShowcase} />
+        <Route path="/profile/setup" component={ProfileSetupRoute} />
 
+        <ProtectedRoute path="/dashboard" component={DashboardFeedRoute} />
         <ProtectedRoute path="/feed" component={DashboardFeedRoute} />
         <ProtectedRoute path="/map" component={DashboardMapRoute} />
         <ProtectedRoute path="/skate-game" component={DashboardSkateGameRoute} />

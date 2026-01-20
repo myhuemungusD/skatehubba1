@@ -19,7 +19,7 @@ export default function SigninPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (auth?.isAuthenticated) {
-      setLocation("/home");
+      setLocation("/dashboard");
     }
   }, [auth?.isAuthenticated, setLocation]);
 
@@ -33,7 +33,7 @@ export default function SigninPage() {
         title: "Welcome back! 🛹",
         description: "You've successfully signed in."
       });
-      setLocation("/home");
+      setLocation("/dashboard");
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Login failed";
       toast({ 
@@ -55,7 +55,7 @@ export default function SigninPage() {
         title: "Welcome! 🛹",
         description: "You've successfully signed in with Google."
       });
-      setLocation("/home");
+      setLocation("/dashboard");
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Google sign-in failed";
       toast({ 

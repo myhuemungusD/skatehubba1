@@ -19,7 +19,7 @@ export default function SignupPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (auth?.isAuthenticated) {
-      setLocation("/home");
+      setLocation("/dashboard");
     }
   }, [auth?.isAuthenticated, setLocation]);
 
@@ -33,7 +33,7 @@ export default function SignupPage() {
         title: "Account Created! 🛹", 
         description: "Welcome to SkateHubba!" 
       });
-      setLocation("/home");
+      setLocation("/dashboard");
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Registration failed";
       toast({ 
@@ -55,7 +55,7 @@ export default function SignupPage() {
         title: "Account Created! 🛹", 
         description: "Welcome to SkateHubba!" 
       });
-      setLocation("/home");
+      setLocation("/dashboard");
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Google sign-up failed";
       toast({ 
