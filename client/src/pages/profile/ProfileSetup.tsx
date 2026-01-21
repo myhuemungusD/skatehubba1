@@ -14,6 +14,11 @@ import { usernameSchema } from "@shared/schema";
 // Define schemas locally
 const stanceSchema = z.enum(["regular", "goofy"]);
 const experienceLevelSchema = z.enum(["beginner", "intermediate", "advanced", "pro"]);
+import {
+  experienceLevelSchema,
+  stanceSchema,
+  usernameSchema,
+} from "@shared/validation/profile";
 
 const formSchema = z.object({
   username: usernameSchema,
@@ -284,6 +289,12 @@ export default function ProfileSetup() {
           favoriteTricks: parseFavoriteTricks(values.favoriteTricks as string | undefined),
           bio: (values.bio as string) || undefined,
           crewName: (values.crewName as string) || undefined,
+          username: skip ? undefined : values.username,
+          stance: values.stance,
+          experienceLevel: values.experienceLevel,
+          favoriteTricks: parseFavoriteTricks(values.favoriteTricks),
+          bio: values.bio || undefined,
+          crewName: values.crewName || undefined,
           skip,
         };
 
@@ -296,6 +307,13 @@ export default function ProfileSetup() {
         // Profile created successfully - AuthProvider will fetch it on next render
         // Redirect to home and let the auth state update naturally
         setLocation("/home", { replace: true });
+        const response = await sendProfileCreateRequest(payload, token, setUploadProgress);
+        auth.setProfile({
+          ...response.profile,
+          createdAt: new Date(response.profile.createdAt),
+          updatedAt: new Date(response.profile.updatedAt),
+        });
+        setLocation("/dashboard", { replace: true });
       } catch (error) {
         console.error("[ProfileSetup] Failed to create profile", error);
         setSubmitError("We couldn't create your profile. Try again.");
@@ -370,6 +388,9 @@ export default function ProfileSetup() {
             </div>
             <p className="text-xs text-neutral-400">{usernameMessage}</p>
             {errors.username && <p className="text-xs text-red-400">{errors.username.message}</p>}
+            {errors.username && (
+              <p className="text-xs text-red-400">{errors.username.message}</p>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -380,6 +401,7 @@ export default function ProfileSetup() {
               <select
                 id="stance"
                 className="h-12 w-full rounded-lg bg-neutral-900/60 border border-neutral-700 text-white px-3"
+                className="h-12 w-full rounded-md border border-neutral-700 bg-neutral-900/60 px-3 text-sm text-white"
                 {...register("stance")}
               >
                 <option value="">Select stance</option>
@@ -395,6 +417,13 @@ export default function ProfileSetup() {
               <select
                 id="experienceLevel"
                 className="h-12 w-full rounded-lg bg-neutral-900/60 border border-neutral-700 text-white px-3"
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-neutral-200" htmlFor="experienceLevel">
+                Experience
+              </label>
+              <select
+                id="experienceLevel"
+                className="h-12 w-full rounded-md border border-neutral-700 bg-neutral-900/60 px-3 text-sm text-white"
                 {...register("experienceLevel")}
               >
                 <option value="">Select level</option>
