@@ -9,7 +9,11 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Progress } from "../../components/ui/progress";
 import { Textarea } from "../../components/ui/textarea";
-import { experienceLevelSchema, stanceSchema, usernameSchema } from "@shared/validation/profile";
+import { usernameSchema } from "@shared/schema";
+
+// Define schemas locally
+const stanceSchema = z.enum(["regular", "goofy"]);
+const experienceLevelSchema = z.enum(["beginner", "intermediate", "advanced", "pro"]);
 
 const formSchema = z.object({
   username: usernameSchema,
@@ -269,12 +273,17 @@ export default function ProfileSetup() {
       try {
         const token = await auth.user.getIdToken();
         const payload: ProfileCreatePayload = {
-          username: skip ? undefined : values.username,
-          stance: values.stance,
-          experienceLevel: values.experienceLevel,
-          favoriteTricks: parseFavoriteTricks(values.favoriteTricks),
-          bio: values.bio || undefined,
-          crewName: values.crewName || undefined,
+          username: skip ? undefined : (values.username as string),
+          stance: values.stance as "regular" | "goofy" | undefined,
+          experienceLevel: values.experienceLevel as
+            | "beginner"
+            | "intermediate"
+            | "advanced"
+            | "pro"
+            | undefined,
+          favoriteTricks: parseFavoriteTricks(values.favoriteTricks as string | undefined),
+          bio: (values.bio as string) || undefined,
+          crewName: (values.crewName as string) || undefined,
           skip,
         };
 
@@ -282,20 +291,10 @@ export default function ProfileSetup() {
           payload.avatarBase64 = await fileToDataUrl(avatarFile);
         }
 
-        const response = await sendProfileCreateRequest(payload, token, setUploadProgress);
+        await sendProfileCreateRequest(payload, token, setUploadProgress);
 
-        // Update auth context with new profile
-        if (auth.setProfile) {
-          auth.setProfile({
-            uid: response.profile.uid,
-            email: auth.user.email || "",
-            displayName: response.profile.username,
-            roles: [],
-            createdAt: new Date(response.profile.createdAt),
-            updatedAt: new Date(response.profile.updatedAt),
-          });
-        }
-
+        // Profile created successfully - AuthProvider will fetch it on next render
+        // Redirect to home and let the auth state update naturally
         setLocation("/home", { replace: true });
       } catch (error) {
         console.error("[ProfileSetup] Failed to create profile", error);
