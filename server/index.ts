@@ -70,9 +70,10 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on("finish", () => {
     const durationMs = Date.now() - start;
+    const loggedPath = req.originalUrl ? req.originalUrl.split("?")[0] : req.url.split("?")[0];
     logger.info("HTTP request", {
       method: req.method,
-      path: req.originalUrl,
+      path: loggedPath,
       status: res.statusCode,
       durationMs,
       ip: req.ip,
