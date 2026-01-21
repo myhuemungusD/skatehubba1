@@ -99,7 +99,7 @@ async function verifyFirebaseRules() {
       
       const authFlag = token ? `--token ${token}` : '';
       const { stdout, stderr } = await execAsync(
-        `firebase deploy --only storage --project ${projectId} ${authFlag} --dry-run`,
+        `firebase deploy --only storage:rules --project ${projectId} ${authFlag} --dry-run`,
         { cwd: projectRoot, maxBuffer: 1024 * 1024 * 10 }
       );
       
