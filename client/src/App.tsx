@@ -24,12 +24,10 @@ import DashboardLayout from "./components/layout/DashboardLayout";
 import ProtectedRoute, { type Params } from "./lib/protected-route";
 
 // Lazy load non-critical pages for better performance
-const Landing = lazy(() => import("./pages/landing"));
-const NewLanding = lazy(() => import("./pages/new-landing"));
 const Home = lazy(() => import("./pages/home"));
 const Tutorial = lazy(() => import("./pages/tutorial"));
 const Demo = lazy(() => import("./pages/demo"));
-const DonationPage = lazy(() => import("./pages/donate"));
+
 const LoginPage = lazy(() => import("./pages/login"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const SignupPage = lazy(() => import("./pages/signup"));
@@ -57,14 +55,44 @@ const CheckinsPage = lazy(() => import("./pages/checkins"));
 const PublicProfileView = lazy(() => import("./features/social/public-profile/PublicProfileView"));
 const BoltsShowcase = lazy(() => import("./features/social/bolts-showcase/BoltsShowcase"));
 
+/**
+ * Routing Policy (Zero-Duplication Architecture)
+ *
+ * PUBLIC ROUTES:
+ * - / (unauthenticated) → /landing (conversion-focused landing page)
+ * - /landing → Public landing page with CTA to enter platform
+ * - /home → Member hub (authenticated users only, action dashboard)
+ *
+ * AUTHENTICATED ROUTES:
+ * - /feed → Activity feed (main authenticated view)
+ * - /map → Spot map
+ * - /skate-game → S.K.A.T.E. battles
+ * - /leaderboard → Rankings
+ *
+ * ROUTING STRATEGY:
+ * - Root (/) redirects unauthenticated users to /landing
+ * - Root (/) redirects authenticated users to /feed
+ * - Landing page: minimal, conversion-focused ("Enter Platform" CTA)
+ * - Home page: member hub with quick actions (Feed/Map/Battle/Profile)
+ * - Legacy routes (/old, /new) removed - zero duplication architecture
+ */
 function RootRedirect() {
+  const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    setLocation("/feed", { replace: true });
-  }, [setLocation]);
+    if (loading) return;
 
-  return null;
+    if (user) {
+      // Authenticated: Go to feed
+      setLocation("/feed", { replace: true });
+    } else {
+      // Unauthenticated: Go to landing
+      setLocation("/landing", { replace: true });
+    }
+  }, [user, loading, setLocation]);
+
+  return <LoadingScreen />;
 }
 
 function DashboardFeedRoute(_props: { params: Params }) {
@@ -131,12 +159,9 @@ function AppRoutes() {
       <Switch>
         <Route path="/auth" component={AuthPage} />
         <Route path="/login" component={LoginPage} />
-        <Route path="/old" component={Landing} />
-        <Route path="/new" component={NewLanding} />
         <Route path="/home" component={Home} />
         <Route path="/landing" component={UnifiedLanding} />
         <Route path="/demo" component={Demo} />
-        <Route path="/donate" component={DonationPage} />
         <Route path="/shop" component={ShopPage} />
         <Route path="/cart" component={CartPage} />
         <Route path="/checkout" component={CheckoutPage} />
