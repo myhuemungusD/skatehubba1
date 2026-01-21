@@ -9,13 +9,11 @@
  * - Quick action buttons (Feed, Map, Battle, Profile)
  * - Live platform stats (member-specific data)
  * - Feature overview with member benefits
- * - Donor recognition (community appreciation)
  * - Email signup (newsletter, lower priority)
  */
 
 import BackgroundCarousel from "../components/BackgroundCarousel";
 import EmailSignup from "../components/EmailSignup";
-import { DonorRecognition } from "../components/DonorRecognition";
 import { MemberHubHero } from "../sections/home/MemberHubHero";
 import { StatsStrip } from "../sections/home/StatsStrip";
 import { FeatureGrid } from "../sections/landing/FeatureGrid";
@@ -73,8 +71,6 @@ export default function Home() {
         </div>
       </section>
 
-      <DonorRecognition />
-
       <EmailSignup />
 
       <footer className="py-8 text-center text-gray-500 bg-black border-t border-orange-400/10">
@@ -82,9 +78,6 @@ export default function Home() {
           <div className="flex flex-wrap justify-center gap-6 mb-4 text-sm">
             <a href="/specs" className="hover:text-orange-400 transition-colors">
               Specs
-            </a>
-            <a href="/donate" className="hover:text-orange-400 transition-colors">
-              Support
             </a>
             <a
               href="mailto:hello@skatehubba.com"
