@@ -34,6 +34,7 @@ const LoginPage = lazy(() => import("./pages/login"));
 const AuthPage = lazy(() => import("./pages/AuthPage"));
 const SignupPage = lazy(() => import("./pages/signup"));
 const SigninPage = lazy(() => import("./pages/signin"));
+const ProfileSetup = lazy(() => import("./pages/profile/ProfileSetup"));
 const VerifyPage = lazy(() => import("./pages/verify"));
 const AuthVerifyPage = lazy(() => import("./pages/auth-verify"));
 const VerifyEmailPage = lazy(() => import("./pages/verify-email"));
@@ -146,6 +147,7 @@ function AppRoutes() {
         <Route path="/game" component={ChallengeLobbyPage} />
         <Route path="/signup" component={SignupPage} />
         <Route path="/signin" component={SigninPage} />
+        <Route path="/profile-setup" component={ProfileSetup} />
         <Route path="/verify" component={VerifyPage} />
         <Route path="/auth/verify" component={AuthVerifyPage} />
         <Route path="/verify-email" component={VerifyEmailPage} />
