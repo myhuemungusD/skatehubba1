@@ -149,7 +149,7 @@ function compareRules() {
     const localFirestore = readLocal(firestoreRulesPath);
     const remoteFirestore = normalize(
       runFirebase([
-        "firestore:rules:get",
+        "firestore:rules",
         "--project",
         projectId,
         "--token",
@@ -171,7 +171,7 @@ function compareRules() {
     const localStorage = readLocal(storageRulesPath);
     const remoteStorage = normalize(
       runFirebase([
-        "storage:rules:get",
+        "storage:rules",
         "--project",
         projectId,
         "--token",
