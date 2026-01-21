@@ -138,8 +138,8 @@ function DashboardTrickmintRoute(_props: { params: Params }) {
 }
 
 function DashboardTutorialRoute(_props: { params: Params }) {
-  const auth = useAuth();
-  const userId = auth.user!.uid;
+  const { user } = useAuth();
+  const userId = user!.uid;
   return (
     <DashboardLayout>
       <Tutorial userId={userId} />
