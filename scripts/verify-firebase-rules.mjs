@@ -67,21 +67,48 @@ const readLocal = (filePath) => normalize(readFileSync(filePath, "utf8"));
 
 /**
  * Executes firebase-tools via npx without invoking a shell.
- * Token is passed as an arg; never logged.
+ * Any --token argument is moved into the child env to avoid exposing it in process listings.
  */
 function runFirebase(args) {
+  // Copy args so we can safely modify them
+  const processedArgs = [...args];
+
+  // Build child environment and ensure we do not accidentally inherit FIREBASE_TOKEN
+  const childEnv = {
+    ...process.env,
+    FIREBASE_TOKEN: undefined,
+  };
+
+  // Extract token from CLI args, if present, and move it into the environment
+  for (let i = 0; i < processedArgs.length; i += 1) {
+    const arg = processedArgs[i];
+
+    // Handle "--token <value>"
+    if (arg === "--token" && i + 1 < processedArgs.length) {
+      const value = processedArgs[i + 1];
+      childEnv.FIREBASE_TOKEN = value;
+      processedArgs.splice(i, 2);
+      i -= 1;
+      continue;
+    }
+
+    // Handle "--token=<value>"
+    if (arg.startsWith("--token=")) {
+      const value = arg.slice("--token=".length);
+      childEnv.FIREBASE_TOKEN = value;
+      processedArgs.splice(i, 1);
+      i -= 1;
+    }
+  }
+
   try {
     return execFileSync(
       "npx",
-      ["firebase-tools@" + toolsVersion, ...args],
+      ["firebase-tools@" + toolsVersion, ...processedArgs],
       {
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
-        env: {
-          ...process.env,
-          // Never echo token; keep environment clean in case tooling prints env.
-          FIREBASE_TOKEN: undefined,
-        },
+        env: childEnv,
       }
     );
   } catch (err) {
