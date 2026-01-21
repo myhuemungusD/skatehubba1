@@ -26,6 +26,7 @@ export default function UnifiedLanding() {
 
       <HeroSection
         badge={landingContent.hero.badge}
+        eyebrow={landingContent.hero.eyebrow}
         title={landingContent.hero.title}
         subtitle={landingContent.hero.subtitle}
         description={landingContent.hero.description}

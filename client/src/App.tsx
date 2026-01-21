@@ -161,6 +161,7 @@ function AppRoutes() {
         <Route path="/login" component={LoginPage} />
         <Route path="/home" component={Home} />
         <Route path="/landing" component={UnifiedLanding} />
+        <Route path="/new-landing" component={UnifiedLanding} />
         <Route path="/demo" component={Demo} />
         <Route path="/shop" component={ShopPage} />
         <Route path="/cart" component={CartPage} />
