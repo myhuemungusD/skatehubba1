@@ -1,4 +1,4 @@
-import logger, { createChildLogger } from "../logger";
+import { createChildLogger } from "../logger";
 
 type AuditContext = {
   userId?: string;
