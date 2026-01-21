@@ -25,6 +25,7 @@ import ProtectedRoute, { type Params } from "./lib/protected-route";
 
 // Lazy load non-critical pages for better performance
 const Home = lazy(() => import("./pages/home"));
+const FeedPage = lazy(() => import("./pages/feed"));
 const Tutorial = lazy(() => import("./pages/tutorial"));
 const Demo = lazy(() => import("./pages/demo"));
 
@@ -43,6 +44,7 @@ const CheckoutPage = lazy(() => import("./pages/checkout"));
 const OrderConfirmationPage = lazy(() => import("./pages/order-confirmation"));
 const ClosetPage = lazy(() => import("./pages/closet"));
 const MapPage = lazy(() => import("./pages/map"));
+const SpotDetailPage = lazy(() => import("./pages/spots/SpotDetailPage"));
 const SkateGamePage = lazy(() => import("./pages/skate-game"));
 const ChallengeLobbyPage = lazy(() => import("./pages/ChallengeLobby"));
 const LeaderboardPage = lazy(() => import("./pages/leaderboard"));
@@ -99,7 +101,7 @@ function RootRedirect() {
 function DashboardFeedRoute(_props: { params: Params }) {
   return (
     <DashboardLayout>
-      <Home />
+      <FeedPage />
     </DashboardLayout>
   );
 }
@@ -108,6 +110,14 @@ function DashboardMapRoute(_props: { params: Params }) {
   return (
     <DashboardLayout>
       <MapPage />
+    </DashboardLayout>
+  );
+}
+
+function DashboardSpotDetailRoute(props: { params: Params }) {
+  return (
+    <DashboardLayout>
+      <SpotDetailPage params={props.params} />
     </DashboardLayout>
   );
 }
@@ -211,6 +221,7 @@ function AppRoutes() {
         <ProtectedRoute path="/dashboard" component={DashboardFeedRoute} />
         <ProtectedRoute path="/feed" component={DashboardFeedRoute} />
         <ProtectedRoute path="/map" component={DashboardMapRoute} />
+        <ProtectedRoute path="/spots/:id" component={DashboardSpotDetailRoute} />
         <ProtectedRoute path="/skate-game" component={DashboardSkateGameRoute} />
         <ProtectedRoute path="/leaderboard" component={DashboardLeaderboardRoute} />
         <ProtectedRoute path="/trickmint" component={DashboardTrickmintRoute} />
