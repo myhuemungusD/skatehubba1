@@ -16,7 +16,6 @@ import { requireCsrfToken } from "./middleware/csrf";
 import { enforceTrustAction } from "./middleware/trustSafety";
 import { z } from "zod";
 import crypto from "node:crypto";
-import type { z } from "zod";
 import { BetaSignupInput } from "@shared/validation/betaSignup";
 import { admin } from "./admin";
 import { env } from "./config/env";
@@ -87,12 +86,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lng: spot.lng,
         },
       });
+
+      return res.status(201).json(spot);
+    }
+  );
+
   app.post(
     "/api/spots/check-in",
     authenticateUser,
     enforceTrustAction("checkin"),
     async (req, res) => {
-      const parsed = checkInSchema.safeParse(req.body);
+      const parsed = SpotCheckInSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid request", issues: parsed.error.flatten() });
       }
@@ -131,9 +135,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid request", issues: parsed.error.flatten() });
     }
 
-      res.status(201).json(spot);
+    if (!req.currentUser?.id) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-  );
+
+    const post = await createPost(req.currentUser.id, parsed.data);
+    return res.status(201).json({ postId: post.id });
+  });
 
   app.post(
     "/api/spots/check-in",
@@ -211,14 +219,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
     }
   );
-    const post = await createPost(userId, parsed.data);
-    return res.status(201).json({ postId: post.id });
-  });
-
-  // Filmer Credit Workflow
-  app.post("/api/filmer/request", authenticateUser, filmerRequestLimiter, handleFilmerRequest);
-  app.post("/api/filmer/respond", authenticateUser, filmerRespondLimiter, handleFilmerRespond);
-  app.get("/api/filmer/requests", authenticateUser, handleFilmerRequestsList);
 
   const getClientIp = (req: Request): string | null => {
     const forwarded = req.headers["x-forwarded-for"];
