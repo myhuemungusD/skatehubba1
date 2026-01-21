@@ -80,7 +80,6 @@ const BoltsShowcase = lazy(() => import("./features/social/bolts-showcase/BoltsS
 function RootRedirect() {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
-  const auth = useAuth();
 
   useEffect(() => {
     if (loading) return;
