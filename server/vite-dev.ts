@@ -13,8 +13,18 @@ const clientDir = path.join(rootDir, "client");
 // Dynamic imports for Vite - only loaded in development
 
 let viteModule: typeof import("vite") | null = null;
-
 let viteLogger: import("vite").Logger | null = null;
+
+const viteConfig = {
+  root: clientDir,
+  resolve: {
+    alias: {
+      "@": path.join(clientDir, "src"),
+      "@shared": path.join(rootDir, "shared"),
+    },
+  },
+  publicDir: path.join(clientDir, "public"),
+};
 
 if (process.env.NODE_ENV === "development") {
   viteModule = await import("vite");
@@ -55,7 +65,7 @@ export async function setupVite(app: Express, server: Server) {
           ...viteLogger,
           error: (msg: string, options?: { timestamp?: boolean; clear?: boolean }) => {
             viteLogger?.error(msg, options);
-            process.exit(1);
+            // process.exit(1);
           },
         }
       : undefined,
