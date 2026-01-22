@@ -16,6 +16,8 @@ paths = [
   '''test-results/.*''',
   '''\.env\.example$''',
   '''docs/.*''',
+  '''_archive/.*''',
+  '''mobile/.*''',
 ]
 regexes = [
   # Test credential placeholders (clearly marked as test values)
