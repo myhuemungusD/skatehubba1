@@ -2,7 +2,6 @@ import { createRoot } from "react-dom/client";
 import { getMissingPublicEnvVars } from "@skatehubba/config";
 import EnvErrorScreen from "./components/EnvErrorScreen";
 import "./index.css";
-import "leaflet/dist/leaflet.css";
 import "./sentry";
 import "./vitals";
 

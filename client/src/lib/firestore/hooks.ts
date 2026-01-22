@@ -1,16 +1,16 @@
-import { useEffect, useState } from 'react';
-import { 
-  collection, 
-  doc, 
-  onSnapshot, 
-  query, 
-  where, 
-  orderBy, 
+import { useEffect, useState } from "react";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  query,
+  where,
+  orderBy,
   limit,
   QueryConstraint,
-  Unsubscribe
-} from 'firebase/firestore';
-import { db } from '../firebase';
+  Unsubscribe,
+} from "firebase/firestore";
+import { db } from "../firebase";
 
 export interface FirestoreHookOptions {
   enabled?: boolean;
@@ -51,16 +51,14 @@ export function useFirestoreCollection<T = any>(
 
     try {
       const collectionRef = collection(db, collectionPath);
-      const q = constraints.length > 0 
-        ? query(collectionRef, ...constraints)
-        : collectionRef;
+      const q = constraints.length > 0 ? query(collectionRef, ...constraints) : collectionRef;
 
       unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const documents = snapshot.docs.map(doc => ({
+          const documents = snapshot.docs.map((doc) => ({
             id: doc.id,
-            ...doc.data()
+            ...doc.data(),
           })) as T[];
           setData(documents);
           setLoading(false);
@@ -82,7 +80,7 @@ export function useFirestoreCollection<T = any>(
         unsubscribe();
       }
     };
-  }, [collectionPath, enabled, ...constraints]);
+  }, [collectionPath, enabled, constraints]);
 
   return { data, loading, error };
 }
@@ -118,7 +116,7 @@ export function useFirestoreDocument<T = any>(
           if (snapshot.exists()) {
             setData({
               id: snapshot.id,
-              ...snapshot.data()
+              ...snapshot.data(),
             } as T);
           } else {
             setData(null);

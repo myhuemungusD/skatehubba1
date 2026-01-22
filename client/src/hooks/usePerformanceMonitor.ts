@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { logPerformance, logger } from '../lib/logger';
+import { useEffect } from "react";
+import { logPerformance, logger } from "../lib/logger";
 
 interface PerformanceMetrics {
   fcp: number | null;
@@ -11,7 +11,7 @@ interface PerformanceMetrics {
 
 export function usePerformanceMonitor() {
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     const metrics: PerformanceMetrics = {
       fcp: null,
@@ -24,41 +24,43 @@ export function usePerformanceMonitor() {
     // Web Vitals observer
     const perfObserver = new PerformanceObserver((entryList) => {
       for (const entry of entryList.getEntries()) {
-        if (entry.name === 'first-contentful-paint') {
+        if (entry.name === "first-contentful-paint") {
           metrics.fcp = entry.startTime;
-          logPerformance('FCP', entry.startTime);
+          logPerformance("FCP", entry.startTime);
         }
 
-        if (entry.entryType === 'largest-contentful-paint') {
+        if (entry.entryType === "largest-contentful-paint") {
           metrics.lcp = entry.startTime;
-          logPerformance('LCP', entry.startTime);
+          logPerformance("LCP", entry.startTime);
         }
 
-        if (entry.entryType === 'first-input') {
+        if (entry.entryType === "first-input") {
           const fidEntry = entry as PerformanceEventTiming;
           metrics.fid = fidEntry.processingStart - fidEntry.startTime;
-          logPerformance('FID', metrics.fid);
+          logPerformance("FID", metrics.fid);
         }
 
-        if (entry.entryType === 'layout-shift' && !(entry as any).hadRecentInput) {
+        if (entry.entryType === "layout-shift" && !(entry as any).hadRecentInput) {
           const currentCls = metrics.cls ?? 0;
           const newCls = currentCls + ((entry as any).value || 0);
           metrics.cls = newCls;
-          logPerformance('CLS', newCls, '');
+          logPerformance("CLS", newCls, "");
         }
       }
     });
 
     try {
-      perfObserver.observe({ entryTypes: ['paint', 'largest-contentful-paint', 'first-input', 'layout-shift'] });
-    } catch (e) {
-      logger.warn('Performance monitoring not fully supported');
+      perfObserver.observe({
+        entryTypes: ["paint", "largest-contentful-paint", "first-input", "layout-shift"],
+      });
+    } catch (error) {
+      logger.warn("Performance monitoring not fully supported", error);
     }
 
     if (window.performance && window.performance.timing) {
       const timing = window.performance.timing;
       metrics.ttfb = timing.responseStart - timing.requestStart;
-      logPerformance('TTFB', metrics.ttfb);
+      logPerformance("TTFB", metrics.ttfb);
     }
 
     return () => {

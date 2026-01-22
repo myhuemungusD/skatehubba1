@@ -152,7 +152,7 @@ export default function ProfileSetup() {
           setUsernameStatus("taken");
           setUsernameMessage("That username is already taken.");
         }
-      } catch (err) {
+      } catch {
         // If request was aborted, do nothing
         if (controller.signal.aborted) return;
 

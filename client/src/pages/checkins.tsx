@@ -33,6 +33,7 @@ function safeDate(input: unknown): Date | null {
 export default function CheckinsPage() {
   const auth = useAuth();
   const user = auth?.user ?? null;
+  const userId = user?.uid ?? null;
   const isAuthenticated = auth?.isAuthenticated ?? false;
   const authLoading = auth?.loading ?? false;
 
@@ -50,7 +51,7 @@ export default function CheckinsPage() {
       if (authLoading) return;
 
       // Not signed in => don’t fetch; show gated UI.
-      if (!isAuthenticated || !user?.uid) {
+      if (!isAuthenticated || !userId || !user) {
         setState("idle");
         setCheckins([]);
         setError(null);
@@ -91,7 +92,7 @@ export default function CheckinsPage() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, isAuthenticated, user?.uid]);
+  }, [authLoading, isAuthenticated, user, userId]);
 
   const headerBadge = useMemo(() => {
     if (!isAuthenticated) return "Sign in required";

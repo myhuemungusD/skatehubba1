@@ -18,23 +18,18 @@ interface LocationPickerProps {
 }
 
 // Dynamic imports for Leaflet to avoid SSR issues
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let MapContainer: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let TileLayer: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let Marker: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let useMapEvents: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let L: any;
 
 const loadLeaflet = async () => {
   if (typeof window === "undefined") return;
-  
+
   const leaflet = await import("leaflet");
   const reactLeaflet = await import("react-leaflet");
-  
+
   L = leaflet.default;
   MapContainer = reactLeaflet.MapContainer;
   TileLayer = reactLeaflet.TileLayer;
@@ -42,7 +37,6 @@ const loadLeaflet = async () => {
   useMapEvents = reactLeaflet.useMapEvents;
 
   // Fix default marker icon issue with webpack
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   delete (L.Icon.Default.prototype as any)._getIconUrl;
   L.Icon.Default.mergeOptions({
     iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
@@ -54,9 +48,12 @@ const loadLeaflet = async () => {
 // Los Angeles default location
 const DEFAULT_CENTER: Location = { lat: 34.0522, lng: -118.2437, address: "Los Angeles, CA" };
 
-function MapClickHandler({ onLocationClick }: { onLocationClick: (lat: number, lng: number) => void }) {
+function MapClickHandler({
+  onLocationClick,
+}: {
+  onLocationClick: (lat: number, lng: number) => void;
+}) {
   useMapEvents({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     click: (e: any) => {
       onLocationClick(e.latlng.lat, e.latlng.lng);
     },
@@ -67,7 +64,9 @@ function MapClickHandler({ onLocationClick }: { onLocationClick: (lat: number, l
 export default function LocationPicker({ onLocationSelect, initialLocation }: LocationPickerProps) {
   const { toast } = useToast();
   const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<Location>(initialLocation || DEFAULT_CENTER);
+  const [selectedLocation, setSelectedLocation] = useState<Location>(
+    initialLocation || DEFAULT_CENTER
+  );
   const [manualLat, setManualLat] = useState(initialLocation?.lat.toString() || "");
   const [manualLng, setManualLng] = useState(initialLocation?.lng.toString() || "");
   const [isGettingLocation, setIsGettingLocation] = useState(false);
@@ -90,7 +89,7 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
 
   const getCurrentLocation = () => {
     setIsGettingLocation(true);
-    
+
     if (!navigator.geolocation) {
       toast({
         title: "Geolocation not supported",
@@ -212,7 +211,9 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
       {/* Manual Coordinate Entry */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="lat" className="text-white">Latitude</Label>
+          <Label htmlFor="lat" className="text-white">
+            Latitude
+          </Label>
           <Input
             id="lat"
             type="number"
@@ -224,7 +225,9 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="lng" className="text-white">Longitude</Label>
+          <Label htmlFor="lng" className="text-white">
+            Longitude
+          </Label>
           <Input
             id="lng"
             type="number"
@@ -248,7 +251,9 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
 
       {selectedLocation && (
         <div className="text-sm text-gray-400 text-center p-2 bg-[#232323] rounded border border-gray-700">
-          Selected: {selectedLocation.address || `${selectedLocation.lat.toFixed(6)}, ${selectedLocation.lng.toFixed(6)}`}
+          Selected:{" "}
+          {selectedLocation.address ||
+            `${selectedLocation.lat.toFixed(6)}, ${selectedLocation.lng.toFixed(6)}`}
         </div>
       )}
 

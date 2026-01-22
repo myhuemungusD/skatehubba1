@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Video, Pause, RotateCcw, Check, X } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Video, Pause, RotateCcw, Check, X } from "lucide-react";
 
 interface TrickRecorderProps {
   spotId: string;
@@ -13,7 +13,7 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
-  const [trickName, setTrickName] = useState('');
+  const [trickName, setTrickName] = useState("");
   const [cameraReady, setCameraReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -23,39 +23,14 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
 
-  useEffect(() => {
-    startCamera();
-    return () => {
-      stopCamera();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (isRecording) {
-      timerRef.current = window.setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
-      }, 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRecording]);
-
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     try {
       let stream: MediaStream;
 
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { ideal: 'environment' }, // Prefer back camera on mobile
+            facingMode: { ideal: "environment" }, // Prefer back camera on mobile
             width: { ideal: 1920 },
             height: { ideal: 1080 },
           },
@@ -63,7 +38,7 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
         });
       } catch (constraintError) {
         console.warn(
-          'Back camera or facingMode constraint not available, retrying without facingMode:',
+          "Back camera or facingMode constraint not available, retrying without facingMode:",
           constraintError
         );
         stream = await navigator.mediaDevices.getUserMedia({
@@ -82,12 +57,12 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
         setCameraReady(true);
       }
     } catch (error) {
-      console.error('Error accessing camera:', error);
-      alert('Unable to access camera. Please check permissions.');
+      console.error("Error accessing camera:", error);
+      alert("Unable to access camera. Please check permissions.");
     }
-  };
+  }, []);
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
@@ -97,7 +72,31 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    startCamera();
+    return () => {
+      stopCamera();
+    };
+  }, [startCamera, stopCamera]);
+
+  useEffect(() => {
+    if (isRecording) {
+      timerRef.current = window.setInterval(() => {
+        setRecordingTime((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isRecording]);
 
   const startRecording = () => {
     if (!streamRef.current) return;
@@ -106,7 +105,7 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
 
     try {
       const mediaRecorder = new MediaRecorder(streamRef.current, {
-        mimeType: 'video/webm;codecs=vp8,opus',
+        mimeType: "video/webm;codecs=vp8,opus",
       });
 
       mediaRecorder.ondataavailable = (event) => {
@@ -116,7 +115,7 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(chunksRef.current, { type: "video/webm" });
         setVideoBlob(blob);
         setIsPreviewing(true);
 
@@ -130,8 +129,8 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
       setIsRecording(true);
       setRecordingTime(0);
     } catch (error) {
-      console.error('Error starting recording:', error);
-      alert('Unable to start recording.');
+      console.error("Error starting recording:", error);
+      alert("Unable to start recording.");
     }
   };
 
@@ -146,10 +145,10 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
     setVideoBlob(null);
     setIsPreviewing(false);
     setRecordingTime(0);
-    setTrickName('');
+    setTrickName("");
 
     if (previewRef.current) {
-      previewRef.current.src = '';
+      previewRef.current.src = "";
     }
   };
 
@@ -158,14 +157,14 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
       onRecordComplete?.(videoBlob, trickName);
       onClose?.();
     } else {
-      alert('Please name your trick before submitting!');
+      alert("Please name your trick before submitting!");
     }
   };
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -183,7 +182,13 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
         {!isPreviewing ? (
           <>
             {/* Live Camera Feed */}
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-cover"
+            />
 
             {/* Camera Overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/50 pointer-events-none">
@@ -197,7 +202,9 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
                   >
                     <div className="bg-red-500 rounded-full px-6 py-3 flex items-center gap-3 shadow-lg">
                       <div className="w-4 h-4 bg-white rounded-full animate-pulse" />
-                      <span className="text-white font-bold text-xl">{formatTime(recordingTime)}</span>
+                      <span className="text-white font-bold text-xl">
+                        {formatTime(recordingTime)}
+                      </span>
                     </div>
                   </motion.div>
                 )}
@@ -243,7 +250,9 @@ export default function TrickRecorder({ spotId, onRecordComplete, onClose }: Tri
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black via-black/80 to-transparent p-6">
               {/* Trick Name Input */}
               <div className="mb-6">
-                <label className="block text-white text-sm font-semibold mb-2">Name Your Trick</label>
+                <label className="block text-white text-sm font-semibold mb-2">
+                  Name Your Trick
+                </label>
                 <input
                   type="text"
                   value={trickName}

@@ -26,11 +26,19 @@ jobs:
     name: "Quality Control"
     needs: lockfile_check
     runs-on: ubuntu-latest
+    env:
+      ALLOW_MISSING_PUBLIC_ENV: "true"
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Show git ref + commit
+        run: |
+          echo "ref=$GITHUB_REF"
+          echo "sha=$GITHUB_SHA"
+          git log -1 --oneline
 
       - uses: ./.github/actions/setup-pnpm-env
 

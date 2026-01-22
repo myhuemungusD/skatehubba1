@@ -163,7 +163,7 @@ export function SpotDetailModal({
         });
       }
     } catch (error) {
-      // User cancelled or error
+      console.error("Failed to share spot:", error);
     }
   };
 
