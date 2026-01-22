@@ -1,136 +1,165 @@
 #!/usr/bin/env node
+/* eslint-disable no-console */
+
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 
 /**
- * Firebase Rules Verification Script
- * 
- * Validates Firestore and Storage rules against Firebase servers.
- * Requires FIREBASE_PROJECT_ID and FIREBASE_TOKEN environment variables.
- * 
- * Security: Token is masked in logs and only runs on protected branches.
+ * Firebase Rules Verification (Enterprise)
+ *
+ * Validates Firebase rules using dry-run deployment.
+ * This checks syntax and compatibility without actually deploying.
+ *
+ * Env:
+ *  - FIREBASE_PROJECT_ID (required)
+ *  - FIREBASE_TOKEN (required) - CI token; never printed
+ *
+ * Optional:
+ *  - FIREBASE_TOOLS_VERSION (default: "latest")
+ *  - FIREBASE_RULES_STRICT (default: "true") - fail if rules files missing
+ *
+ * Usage:
+ *  node scripts/verify-firebase-rules.mjs
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { existsSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+const projectId = process.env.FIREBASE_PROJECT_ID;
+const token = process.env.FIREBASE_TOKEN;
+const toolsVersion = process.env.FIREBASE_TOOLS_VERSION ?? "latest";
+const strict = (process.env.FIREBASE_RULES_STRICT ?? "true").toLowerCase() === "true";
 
-const execAsync = promisify(exec);
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const projectRoot = join(__dirname, '..');
-
-// Mask sensitive values in output
-function maskToken(output, token) {
-  if (!token) return output;
-  return output.replace(new RegExp(token, 'g'), '***MASKED***');
-}
-
-async function verifyFirebaseRules() {
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const token = process.env.FIREBASE_TOKEN;
-  const serviceAccount = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-
-  // Validation
-  if (!projectId) {
-    console.error('❌ FIREBASE_PROJECT_ID environment variable is required');
-    process.exit(1);
-  }
-
-  // Support both token and service account auth
-  if (!token && !serviceAccount) {
-    console.error('❌ Either FIREBASE_TOKEN or GOOGLE_APPLICATION_CREDENTIALS environment variable is required');
-    process.exit(1);
-  }
-
-  const authMethod = serviceAccount ? 'service account' : 'token';
-  console.log(`🔍 Verifying Firebase rules for project: ${projectId}`);
-  console.log(`🔒 Auth method: ${authMethod}`);
-
-  // Check if rules files exist
-  const firestoreRulesPath = join(projectRoot, 'firestore.rules');
-  const storageRulesPath = join(projectRoot, 'storage.rules');
-
-  if (!existsSync(firestoreRulesPath)) {
-    console.warn('⚠️  firestore.rules not found, skipping Firestore validation');
-  }
-
-  if (!existsSync(storageRulesPath)) {
-    console.warn('⚠️  storage.rules not found, skipping Storage validation');
-  }
-
-  let hasErrors = false;
-
-  // Verify Firestore rules
-  if (existsSync(firestoreRulesPath)) {
-    try {
-      console.log('\n📋 Validating Firestore rules...');
-      
-      const authFlag = token ? `--token ${token}` : '';
-      const { stdout, stderr } = await execAsync(
-        `firebase deploy --only firestore:rules --project ${projectId} ${authFlag} --dry-run`,
-        { cwd: projectRoot, maxBuffer: 1024 * 1024 * 10 }
-      );
-      
-      const maskedStdout = maskToken(stdout, token);
-      const maskedStderr = maskToken(stderr, token);
-      
-      if (maskedStdout) console.log(maskedStdout);
-      const isDryRunSuccessMessage =
-        /dry[- ]run (successful|completed)/i.test(maskedStderr) ||
-        /would (have )?deploy(ed)?/i.test(maskedStderr);
-      if (maskedStderr && !isDryRunSuccessMessage) console.error(maskedStderr);
-      
-      console.log('✅ Firestore rules are valid');
-    } catch (error) {
-      hasErrors = true;
-      const maskedError = maskToken(error.message, token);
-      const maskedStderr = maskToken(error.stderr || '', token);
-      console.error('❌ Firestore rules validation failed:');
-      console.error(maskedError);
-      if (maskedStderr) console.error(maskedStderr);
-    }
-  }
-
-  // Verify Storage rules
-  if (existsSync(storageRulesPath)) {
-    try {
-      console.log('\n📦 Validating Storage rules...');
-      
-      const authFlag = token ? `--token ${token}` : '';
-      const { stdout, stderr } = await execAsync(
-        `firebase deploy --only storage:rules --project ${projectId} ${authFlag} --dry-run`,
-        { cwd: projectRoot, maxBuffer: 1024 * 1024 * 10 }
-      );
-      
-      const maskedStdout = maskToken(stdout, token);
-      const maskedStderr = maskToken(stderr, token);
-      
-      if (maskedStdout) console.log(maskedStdout);
-      if (maskedStderr && !maskedStderr.includes('dry-run')) console.error(maskedStderr);
-      
-      console.log('✅ Storage rules are valid');
-    } catch (error) {
-      hasErrors = true;
-      const maskedError = maskToken(error.message, token);
-      const maskedStderr = maskToken(error.stderr || '', token);
-      console.error('❌ Storage rules validation failed:');
-      console.error(maskedError);
-      if (maskedStderr) console.error(maskedStderr);
-    }
-  }
-
-  if (hasErrors) {
-    console.error('\n❌ Firebase rules verification failed');
-    process.exit(1);
-  }
-
-  console.log('\n✅ All Firebase rules are valid');
-}
-
-verifyFirebaseRules().catch((error) => {
-  const token = process.env.FIREBASE_TOKEN;
-  const maskedError = maskToken(error.message || error.toString(), token);
-  console.error('❌ Unexpected error:', maskedError);
+if (!projectId) {
+  console.error("❌ Missing FIREBASE_PROJECT_ID.");
   process.exit(1);
-});
+}
+if (!token) {
+  console.error("❌ Missing FIREBASE_TOKEN.");
+  process.exit(1);
+}
+
+const repoRoot = process.cwd();
+const firestoreRulesPath = path.join(repoRoot, "firestore.rules");
+const storageRulesPath = path.join(repoRoot, "storage.rules");
+
+const hasFirestoreRules = existsSync(firestoreRulesPath);
+const hasStorageRules = existsSync(storageRulesPath);
+
+if (strict && !hasFirestoreRules) {
+  console.error("❌ firestore.rules not found at repo root.");
+  process.exit(1);
+}
+if (strict && !hasStorageRules) {
+  console.error("❌ storage.rules not found at repo root.");
+  process.exit(1);
+}
+
+const normalize = (s) => s.replace(/\r\n/g, "\n").trim() + "\n";
+
+const readLocal = (filePath) => normalize(readFileSync(filePath, "utf8"));
+
+/**
+ * Executes firebase-tools via npx without invoking a shell.
+ * Any --token argument is moved into the child env to avoid exposing it in process listings.
+ */
+function runFirebase(args) {
+  // Copy args so we can safely modify them
+  const processedArgs = [...args];
+
+  // Build child environment and ensure we do not accidentally inherit FIREBASE_TOKEN
+  const childEnv = {
+    ...process.env,
+    FIREBASE_TOKEN: undefined,
+  };
+
+  // Extract token from CLI args, if present, and move it into the environment
+  for (let i = 0; i < processedArgs.length; i += 1) {
+    const arg = processedArgs[i];
+
+    // Handle "--token <value>"
+    if (arg === "--token" && i + 1 < processedArgs.length) {
+      const value = processedArgs[i + 1];
+      childEnv.FIREBASE_TOKEN = value;
+      processedArgs.splice(i, 2);
+      i -= 1;
+      continue;
+    }
+
+    // Handle "--token=<value>"
+    if (arg.startsWith("--token=")) {
+      const value = arg.slice("--token=".length);
+      childEnv.FIREBASE_TOKEN = value;
+      processedArgs.splice(i, 1);
+      i -= 1;
+    }
+  }
+
+  try {
+    return execFileSync(
+      "npx",
+      ["firebase-tools@" + toolsVersion, ...processedArgs],
+      {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+        env: childEnv,
+      }
+    );
+  } catch (err) {
+    // Sanitize any accidental token echo from stderr/stdout
+    const stdout = typeof err?.stdout === "string" ? err.stdout : "";
+    const stderr = typeof err?.stderr === "string" ? err.stderr : "";
+    const msg = typeof err?.message === "string" ? err.message : "firebase-tools failed";
+    const safe = (txt) => (txt ? txt.replaceAll(token, "***MASKED***") : txt);
+
+    console.error("❌ firebase-tools command failed.");
+    console.error(safe(msg));
+    if (stdout) console.error(safe(stdout));
+    if (stderr) console.error(safe(stderr));
+
+    process.exit(1);
+  }
+}
+
+function validateRules() {
+  console.log(`🔍 Validate rules (dry-run) for project: ${projectId}`);
+
+  if (hasFirestoreRules) {
+    console.log("  • Firestore rules: validating…");
+    runFirebase([
+      "deploy",
+      "--only",
+      "firestore:rules",
+      "--project",
+      projectId,
+      "--token",
+      token,
+      "--non-interactive",
+      "--dry-run",
+    ]);
+    console.log("  ✅ Firestore rules validate (dry-run) OK");
+  } else {
+    console.log("  ⚠️  Firestore rules missing; skipped");
+  }
+
+  if (hasStorageRules) {
+    console.log("  • Storage rules: validating…");
+    runFirebase([
+      "deploy",
+      "--only",
+      "storage",
+      "--project",
+      projectId,
+      "--token",
+      token,
+      "--non-interactive",
+      "--dry-run",
+    ]);
+    console.log("  ✅ Storage rules validate (dry-run) OK");
+  } else {
+    console.log("  ⚠️  Storage rules missing; skipped");
+  }
+}
+
+// Validate rules (dry-run deployment)
+validateRules();
+
+console.log("✅ Firebase rules verification complete.");

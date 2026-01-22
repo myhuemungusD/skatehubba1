@@ -7,8 +7,9 @@ import { customUsers, spots, games } from "@shared/schema";
 import { ilike, or, eq, count, sql } from "drizzle-orm";
 import { insertSpotSchema } from "@shared/schema";
 import {
-  filmerRequestLimiter,
-  filmerRespondLimiter,
+  checkInIpLimiter,
+  perUserCheckInLimiter,
+  perUserSpotWriteLimiter,
   publicWriteLimiter,
 } from "./middleware/security";
 import { requireCsrfToken } from "./middleware/csrf";
@@ -22,11 +23,10 @@ import { authenticateUser } from "./auth/middleware";
 import { verifyAndCheckIn } from "./services/spotService";
 import { analyticsRouter } from "./routes/analytics";
 import { metricsRouter } from "./routes/metrics";
-import {
-  handleFilmerRequest,
-  handleFilmerRequestsList,
-  handleFilmerRespond,
-} from "./routes/filmer";
+import { validateBody } from "./middleware/validation";
+import { SpotCheckInSchema, type SpotCheckInRequest } from "@shared/validation/spotCheckIn";
+import { logAuditEvent } from "./services/auditLog";
+import { verifyReplayProtection } from "./services/replayProtection";
 import { moderationRouter } from "./routes/moderation";
 import { createPost } from "./services/moderationStore";
 import { sendQuickMatchNotification } from "./services/notificationService";
@@ -55,39 +55,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(spots);
   });
 
-  app.post("/api/spots", publicWriteLimiter, requireCsrfToken, async (req, res) => {
-    // Basic Auth Check: Ensure we have a user ID to bind the spot to
-    if (!req.isAuthenticated()) {
-      return res.status(401).json({ message: "You must be logged in to create a spot" });
+  app.post(
+    "/api/spots",
+    publicWriteLimiter,
+    perUserSpotWriteLimiter,
+    requireCsrfToken,
+    validateBody(insertSpotSchema),
+    async (req, res) => {
+      // Basic Auth Check: Ensure we have a user ID to bind the spot to
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: "You must be logged in to create a spot" });
+      }
+
+      type InsertSpot = z.infer<typeof insertSpotSchema>;
+      const spotPayload = req.body as InsertSpot;
+
+      // Creation: Pass 'createdBy' from the authenticated session
+      const spot = await spotStorage.createSpot({
+        ...spotPayload,
+        createdBy: req.currentUser?.id || "",
+      });
+
+      logAuditEvent({
+        action: "spot.created",
+        userId: req.currentUser?.id,
+        ip: getClientIp(req),
+        metadata: {
+          spotId: spot.id,
+          lat: spot.lat,
+          lng: spot.lng,
+        },
+      });
+
+      return res.status(201).json(spot);
     }
-
-    // Validation: Zod Parse
-    const result = insertSpotSchema.safeParse(req.body);
-    if (!result.success) {
-      return res.status(400).json(result.error);
-    }
-
-    // Creation: Pass 'createdBy' from the authenticated session
-    const spot = await spotStorage.createSpot({
-      ...result.data,
-      createdBy: req.currentUser?.id || "",
-    });
-
-    res.status(201).json(spot);
-  });
-
-  const checkInSchema = z.object({
-    spotId: z.number().int(),
-    lat: z.number(),
-    lng: z.number(),
-  });
+  );
 
   app.post(
     "/api/spots/check-in",
     authenticateUser,
     enforceTrustAction("checkin"),
     async (req, res) => {
-      const parsed = checkInSchema.safeParse(req.body);
+      const parsed = SpotCheckInSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid request", issues: parsed.error.flatten() });
       }
@@ -126,19 +135,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid request", issues: parsed.error.flatten() });
     }
 
-    const userId = req.currentUser?.id;
-    if (!userId) {
-      return res.status(401).json({ message: "Authentication required" });
+    if (!req.currentUser?.id) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const post = await createPost(userId, parsed.data);
+    const post = await createPost(req.currentUser.id, parsed.data);
     return res.status(201).json({ postId: post.id });
   });
 
-  // Filmer Credit Workflow
-  app.post("/api/filmer/request", authenticateUser, filmerRequestLimiter, handleFilmerRequest);
-  app.post("/api/filmer/respond", authenticateUser, filmerRespondLimiter, handleFilmerRespond);
-  app.get("/api/filmer/requests", authenticateUser, handleFilmerRequestsList);
+  app.post(
+    "/api/spots/check-in",
+    authenticateUser,
+    checkInIpLimiter,
+    perUserCheckInLimiter,
+    validateBody(SpotCheckInSchema),
+    async (req, res) => {
+      const parsedBody = req.body as SpotCheckInRequest;
+
+      const userId = req.currentUser?.id;
+      if (!userId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { spotId, lat, lng, nonce, clientTimestamp } = parsedBody;
+
+      const replayCheck = await verifyReplayProtection(userId, {
+        spotId,
+        lat,
+        lng,
+        nonce,
+        clientTimestamp,
+      });
+      if (!replayCheck.ok) {
+        const status = replayCheck.reason === "replay_detected" ? 409 : 400;
+        const message =
+          replayCheck.reason === "replay_detected"
+            ? "Replay detected"
+            : "Invalid check-in timestamp";
+        logAuditEvent({
+          action: "spot.checkin.rejected",
+          userId,
+          ip: getClientIp(req),
+          metadata: {
+            spotId,
+            reason: replayCheck.reason,
+          },
+        });
+        return res.status(status).json({ message });
+      }
+
+      try {
+        const result = await verifyAndCheckIn(userId, spotId, lat, lng);
+        if (!result.success) {
+          logAuditEvent({
+            action: "spot.checkin.denied",
+            userId,
+            ip: getClientIp(req),
+            metadata: {
+              spotId,
+              reason: result.message,
+            },
+          });
+          return res.status(403).json({ message: result.message });
+        }
+
+        logAuditEvent({
+          action: "spot.checkin.approved",
+          userId,
+          ip: getClientIp(req),
+          metadata: {
+            spotId,
+            checkInId: result.checkInId,
+          },
+        });
+
+        return res.status(200).json(result);
+      } catch (error) {
+        if (error instanceof Error && error.message === "Spot not found") {
+          return res.status(404).json({ message: "Spot not found" });
+        }
+
+        return res.status(500).json({ message: "Check-in failed" });
+      }
+    }
+  );
 
   const getClientIp = (req: Request): string | null => {
     const forwarded = req.headers["x-forwarded-for"];
@@ -166,69 +246,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const getTimestampMillis = (value: unknown) =>
     value instanceof admin.firestore.Timestamp ? value.toMillis() : null;
 
-  app.post("/api/beta-signup", async (req, res) => {
-    const parsed = BetaSignupInput.safeParse(req.body);
-    if (!parsed.success) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "VALIDATION_ERROR", details: parsed.error.flatten() });
-    }
+  app.post(
+    "/api/beta-signup",
+    validateBody(BetaSignupInput, { errorCode: "VALIDATION_ERROR" }),
+    async (req, res) => {
+      const { email, platform } = req.body as BetaSignupInput;
+      const ip = getClientIp(req);
+      const salt = env.IP_HASH_SALT || "";
+      const ipHash = ip && salt ? hashIp(ip, salt) : undefined;
 
-    const { email, platform } = parsed.data;
-    const ip = getClientIp(req);
-    const salt = env.IP_HASH_SALT || "";
-    const ipHash = ip && salt ? hashIp(ip, salt) : undefined;
+      try {
+        const docId = crypto.createHash("sha256").update(email).digest("hex").slice(0, 32);
 
-    try {
-      const docId = crypto.createHash("sha256").update(email).digest("hex").slice(0, 32);
+        const docRef = admin.firestore().collection("mail_list").doc(docId);
+        const nowMillis = admin.firestore.Timestamp.now().toMillis();
 
-      const docRef = admin.firestore().collection("mail_list").doc(docId);
-      const nowMillis = admin.firestore.Timestamp.now().toMillis();
+        await admin.firestore().runTransaction(async (transaction) => {
+          const snapshot = await transaction.get(docRef);
+          const data = snapshot.exists ? snapshot.data() : null;
+          const lastSubmittedAtMillis =
+            getTimestampMillis(data?.lastSubmittedAt) ?? getTimestampMillis(data?.createdAt);
 
-      await admin.firestore().runTransaction(async (transaction) => {
-        const snapshot = await transaction.get(docRef);
-        const data = snapshot.exists ? snapshot.data() : null;
-        const lastSubmittedAtMillis =
-          getTimestampMillis(data?.lastSubmittedAt) ?? getTimestampMillis(data?.createdAt);
+          if (lastSubmittedAtMillis && nowMillis - lastSubmittedAtMillis < RATE_LIMIT_WINDOW_MS) {
+            throw new Error("RATE_LIMITED");
+          }
 
-        if (lastSubmittedAtMillis && nowMillis - lastSubmittedAtMillis < RATE_LIMIT_WINDOW_MS) {
-          throw new Error("RATE_LIMITED");
-        }
+          if (snapshot.exists) {
+            transaction.set(
+              docRef,
+              {
+                platform,
+                ...(ipHash ? { ipHash } : {}),
+                lastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
+                submitCount: admin.firestore.FieldValue.increment(1),
+                source: "skatehubba.com",
+              },
+              { merge: true }
+            );
+            return;
+          }
 
-        if (snapshot.exists) {
-          transaction.set(
-            docRef,
-            {
-              platform,
-              ...(ipHash ? { ipHash } : {}),
-              lastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
-              submitCount: admin.firestore.FieldValue.increment(1),
-              source: "skatehubba.com",
-            },
-            { merge: true }
-          );
-          return;
-        }
-
-        transaction.set(docRef, {
-          email,
-          platform,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          lastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
-          submitCount: 1,
-          ...(ipHash ? { ipHash } : {}),
-          source: "skatehubba.com",
+          transaction.set(docRef, {
+            email,
+            platform,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastSubmittedAt: admin.firestore.FieldValue.serverTimestamp(),
+            submitCount: 1,
+            ...(ipHash ? { ipHash } : {}),
+            source: "skatehubba.com",
+          });
         });
-      });
 
-      return res.status(200).json({ ok: true });
-    } catch (error) {
-      if (error instanceof Error && error.message === "RATE_LIMITED") {
-        return res.status(429).json({ ok: false, error: "RATE_LIMITED" });
+        return res.status(200).json({ ok: true });
+      } catch (error) {
+        if (error instanceof Error && error.message === "RATE_LIMITED") {
+          return res.status(429).json({ ok: false, error: "RATE_LIMITED" });
+        }
+        return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
       }
-      return res.status(500).json({ ok: false, error: "SERVER_ERROR" });
     }
-  });
+  );
 
   // 3. User Search and Browse Endpoints
   app.get("/api/users/search", authenticateUser, async (req, res) => {

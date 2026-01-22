@@ -76,41 +76,67 @@ export const publicWriteLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const getRateLimitKey = (req: Request, _res: Response): string => {
-  const userId = req.currentUser?.id;
+const getDeviceFingerprint = (req: Request): string | null => {
+  const deviceId = req.get("x-device-id");
+  if (deviceId) return deviceId;
 
-  // req.ip can be undefined depending on proxy config/types, so harden it.
-  const ip =
-    req.ip ||
-    (typeof req.headers["x-forwarded-for"] === "string"
-      ? req.headers["x-forwarded-for"].split(",")[0]?.trim()
-      : undefined) ||
-    req.socket?.remoteAddress ||
-    "unknown";
+  const sessionId = req.get("x-session-id");
+  if (sessionId) return sessionId;
 
-  return userId ? `${userId}:${ip}` : ip;
+  const fingerprint = req.get("x-client-fingerprint");
+  if (fingerprint) return fingerprint;
+
+  return null;
 };
 
-export const filmerRequestLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 20,
+const userKeyGenerator = (req: Request): string => {
+  const userId = req.currentUser?.id ?? "anonymous";
+  const ip = req.ip ?? "unknown-ip";
+  const device = getDeviceFingerprint(req) ?? "unknown-device";
+
+  // Handle edge case where all identifiers are at their fallback values.
+  // Add additional entropy from request headers so that such requests do not
+  // all share the same rate limit key.
+  if (userId === "anonymous" && ip === "unknown-ip" && device === "unknown-device") {
+    const userAgent = req.get("user-agent") ?? "unknown-ua";
+    const acceptLanguage = req.get("accept-language") ?? "unknown-lang";
+    const forwardedFor = req.get("x-forwarded-for") ?? "unknown-forwarded";
+
+    return `${userId}:${device}:${ip}:${userAgent}:${acceptLanguage}:${forwardedFor}`;
+  }
+  return `${userId}:${device}:${ip}`;
+};
+
+export const checkInIpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 60, // 60 check-ins per 10 minutes per IP
   message: {
-    error: "Too many filmer requests, please slow down.",
+    error: "Check-in rate limit exceeded.",
   },
-  keyGenerator: getRateLimitKey,
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-export const filmerRespondLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  max: 60,
+export const perUserSpotWriteLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // 5 spot creations per hour per user
   message: {
-    error: "Too many filmer responses, please slow down.",
+    error: "Spot creation rate limit exceeded.",
   },
-  keyGenerator: getRateLimitKey,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: userKeyGenerator,
+});
+
+export const perUserCheckInLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // 20 check-ins per hour per user
+  message: {
+    error: "Check-in rate limit exceeded.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: userKeyGenerator,
 });
 
 /**
