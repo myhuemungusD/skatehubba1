@@ -8,24 +8,13 @@ import { staticFileLimiter } from "./middleware/security";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(__dirname, "..");
+const clientDir = path.join(rootDir, "client");
 
 // Dynamic imports for Vite - only loaded in development
 
 let viteModule: typeof import("vite") | null = null;
 
 let viteLogger: import("vite").Logger | null = null;
-
-// Inline vite config for dev server (avoids importing root vite.config.ts which has external deps)
-const viteConfig = {
-  root: path.join(rootDir, "client"),
-  resolve: {
-    alias: {
-      "@": path.join(rootDir, "client/src"),
-      "@shared": path.join(rootDir, "shared"),
-    },
-  },
-  publicDir: path.join(rootDir, "public"),
-};
 
 if (process.env.NODE_ENV === "development") {
   viteModule = await import("vite");

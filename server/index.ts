@@ -18,6 +18,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Trust first proxy (Replit's reverse proxy)
+// Required for express-rate-limit to work correctly with X-Forwarded-For headers
+app.set('trust proxy', 1);
+
 const server = http.createServer(app);
 
 // Security middleware

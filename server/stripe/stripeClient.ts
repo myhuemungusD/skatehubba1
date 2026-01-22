@@ -1,4 +1,5 @@
-import Stripe from 'stripe';
+import * as StripeModule from 'stripe';
+const Stripe = (StripeModule as any).default || StripeModule;
 
 let connectionSettings: any;
 

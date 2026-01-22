@@ -78,7 +78,7 @@ router.get('/stripe-publishable-key', async (_req: Request, res: Response) => {
   }
 });
 
-router.get('/products', async (_req: Request, res: Response) => {
+router.get('/stripe/products', async (_req: Request, res: Response) => {
   try {
     const stripe = await getUncachableStripeClient();
     

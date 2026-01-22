@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { setupAuthRoutes } from "./auth/routes";
 import { spotStorage } from "./storage/spots";
 import { getDb, isDatabaseAvailable } from "./db";
-import { customUsers, userProfiles, spots, games } from "@shared/schema";
+import { customUsers, userProfiles, spots, games, products } from "@shared/schema";
 import { ilike, or, eq, count } from "drizzle-orm";
 import { insertSpotSchema } from "@shared/schema";
 import { publicWriteLimiter } from "./middleware/security";
@@ -86,7 +86,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // 3. Public Stats Endpoint (for landing page)
+  // 5. Products Endpoint (for shop page)
+  app.get("/api/products", async (_req, res) => {
+    try {
+      if (!isDatabaseAvailable()) {
+        return res.json([]);
+      }
+      const database = getDb();
+      const allProducts = await database
+        .select()
+        .from(products)
+        .where(eq(products.isActive, true));
+      
+      res.json(allProducts);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      res.json([]);
+    }
+  });
+
+  // 6. Public Stats Endpoint (for landing page)
   app.get("/api/stats", async (_req, res) => {
     try {
       if (!isDatabaseAvailable()) {
