@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx index.ts",
-    "dev": "tsx watch index.ts",
+    "dev": "tsx watch --ignore ../client index.ts",
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "build": "node ../scripts/build-server.mjs"

@@ -58,14 +58,13 @@ export async function setupVite(app: Express, server: Server) {
   };
 
   const vite = await viteModule.createServer({
-    ...viteConfig,
-    configFile: false,
+    root: clientDir,
+    configFile: path.join(clientDir, "vite.config.ts"),
     customLogger: viteLogger
       ? {
           ...viteLogger,
           error: (msg: string, options?: { timestamp?: boolean; clear?: boolean }) => {
             viteLogger?.error(msg, options);
-            // process.exit(1);
           },
         }
       : undefined,
