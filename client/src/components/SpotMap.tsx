@@ -1,6 +1,6 @@
-import { useEffect, useRef, useMemo, useState, memo } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+// Leaflet CSS is dynamically loaded on map pages to avoid global CSS cost
 
 // Fix for default marker icons in Leaflet with Vite
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -50,16 +50,17 @@ export const SpotMap = memo(function SpotMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const spotMarkersRef = useRef<Map<number, L.Marker>>(new Map());
-  const markerProximityRef = useRef<Map<number, string>>(new Map()); // Track state to prevent redundant DOM updates
+  const markerProximityRef = useRef<Map<number, string>>(new Map());
   const userMarkerRef = useRef<L.Marker | null>(null);
   const accuracyCircleRef = useRef<L.Circle | null>(null);
-  const hasCenteredRef = useRef(false); // Track if we've centered on user location
+  const hasCenteredRef = useRef(false);
   const tempMarkerRef = useRef<L.Marker | null>(null);
+  const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
+
   const initialCenterRef = useRef<[number, number]>(
     userLocation ? [userLocation.lat, userLocation.lng] : [40.7589, -73.9851]
   );
-  const initialZoomRef = useRef(userLocation ? 15 : 12);
-  const [bounds, setBounds] = useState<L.LatLngBounds | null>(null);
+  const initialZoomRef = useRef<number>(userLocation ? 15 : 12);
 
   // ELON AUDIT FIX: Flyweight Pattern
   // Create icons ONCE. Don't allocate 1000 objects every render frame.
@@ -94,65 +95,66 @@ export const SpotMap = memo(function SpotMap({
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    try {
-      // Create map instance with default view
-      const map = L.map(mapContainerRef.current, {
-        center: initialCenterRef.current, // NYC default
-        zoom: initialZoomRef.current,
-        scrollWheelZoom: true,
-        zoomControl: true,
-      });
+    let isMounted = true;
 
-      // Add tile layer
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19,
-      }).addTo(map);
+    const initMap = async () => {
+      try {
+        await import("leaflet/dist/leaflet.css");
 
-      mapInstanceRef.current = map;
+        if (!isMounted || !mapContainerRef.current || mapInstanceRef.current) return;
 
-      // ELON AUDIT FIX: Viewport Culling
-      // Only render what the user can see.
-      map.on("moveend", () => setBounds(map.getBounds()));
-      setBounds(map.getBounds());
+        const map = L.map(mapContainerRef.current, {
+          center: initialCenterRef.current,
+          zoom: initialZoomRef.current,
+          scrollWheelZoom: true,
+          zoomControl: true,
+        });
 
-      setTimeout(() => {
-        map.invalidateSize();
-      }, 100);
-    } catch (error) {
-      console.error("Failed to initialize map:", error);
-    }
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }).addTo(map);
 
-    const spotMarkers = spotMarkersRef.current;
-    const markerProximity = markerProximityRef.current;
-    const userMarker = userMarkerRef.current;
-    const accuracyCircle = accuracyCircleRef.current;
-    const map = mapInstanceRef.current;
+        mapInstanceRef.current = map;
+
+        // ELON AUDIT FIX: Viewport Culling
+        map.on("moveend", () => setBounds(map.getBounds()));
+        setBounds(map.getBounds());
+
+        setTimeout(() => {
+          map.invalidateSize();
+        }, 100);
+      } catch (error) {
+        console.error("Failed to initialize map:", error);
+      }
+    };
+
+    void initMap();
 
     // Cleanup only on unmount
     return () => {
-      spotMarkers.forEach((marker) => marker.remove());
-      spotMarkers.clear();
-      markerProximity.clear();
+      isMounted = false;
+      spotMarkersRef.current.forEach((marker) => marker.remove());
+      spotMarkersRef.current.clear();
+      markerProximityRef.current.clear();
 
-      if (userMarker) {
-        userMarker.remove();
+      if (userMarkerRef.current) {
+        userMarkerRef.current.remove();
+        userMarkerRef.current = null;
       }
 
-      if (accuracyCircle) {
-        accuracyCircle.remove();
+      if (accuracyCircleRef.current) {
+        accuracyCircleRef.current.remove();
+        accuracyCircleRef.current = null;
       }
 
-      if (map) {
-        map.remove();
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
       }
-
-      userMarkerRef.current = null;
-      accuracyCircleRef.current = null;
-      mapInstanceRef.current = null;
     };
-  }, []); // Empty dependency array - only run once
+  }, []);
 
   // ELON AUDIT FIX: Filter spots to viewport
   // This reduces DOM nodes from N (total spots) to n (visible spots)
