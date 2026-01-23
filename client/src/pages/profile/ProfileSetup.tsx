@@ -3,13 +3,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation, useSearch } from "wouter";
-import { CheckCircle, Loader2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2, XCircle } from "lucide-react";
 import { useAuth } from "../../context/AuthProvider";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Progress } from "../../components/ui/progress";
 import { usernameSchema } from "@shared/schema";
 import { apiRequest, buildApiUrl } from "../../lib/api/client";
+import { getUserFriendlyMessage, isApiError } from "../../lib/api/errors";
 
 /**
  * Enterprise rules applied:
@@ -35,7 +36,7 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
+type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid" | "unverified";
 
 type ProfileCreatePayload = {
   username?: string;
@@ -103,6 +104,7 @@ export default function ProfileSetup() {
 
   const usernameCheckAbortRef = useRef<AbortController | null>(null);
   const usernameCheckSeqRef = useRef(0);
+  const usernameWarnedRef = useRef(false);
 
   const {
     register,
@@ -140,7 +142,7 @@ export default function ProfileSetup() {
     const parsed = usernameSchema.safeParse(username);
     if (!parsed.success) {
       setUsernameStatus("invalid");
-      setUsernameMessage("3–20 characters, letters and numbers only.");
+      setUsernameMessage("3-20 characters, letters and numbers only.");
       return;
     }
 
@@ -172,7 +174,7 @@ export default function ProfileSetup() {
           setUsernameStatus("taken");
           setUsernameMessage("That username is already taken.");
         }
-      } catch {
+      } catch (error) {
         // If request was aborted, do nothing
         if (controller.signal.aborted) return;
 
@@ -180,8 +182,12 @@ export default function ProfileSetup() {
         if (seq !== usernameCheckSeqRef.current) return;
 
         // Network or server issue - allow submit, but show warning
-        setUsernameStatus("idle");
-        setUsernameMessage("Could not verify username right now.");
+        if (!usernameWarnedRef.current) {
+          console.warn("[ProfileSetup] Username check failed", error);
+          usernameWarnedRef.current = true;
+        }
+        setUsernameStatus("unverified");
+        setUsernameMessage("Could not verify username. We'll check on submit.");
       }
     }, 500);
 
@@ -216,8 +222,42 @@ export default function ProfileSetup() {
         </span>
       );
     }
+    if (usernameStatus === "unverified") {
+      return (
+        <span className="inline-flex items-center gap-1 text-sm text-yellow-300">
+          <AlertTriangle className="h-4 w-4" />
+          Unverified
+        </span>
+      );
+    }
     return null;
   }, [usernameStatus]);
+
+  const checkUsernameAvailability = useCallback(
+    async (value: string, timeoutMs: number): Promise<"available" | "taken" | "unknown"> => {
+      if (typeof window === "undefined") return "unknown";
+      const parsed = usernameSchema.safeParse(value);
+      if (!parsed.success) return "unknown";
+
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const res = await fetch(
+          buildApiUrl(`/api/profile/username-check?username=${encodeURIComponent(parsed.data)}`),
+          { signal: controller.signal }
+        );
+        if (!res.ok) return "unknown";
+        const data = UsernameCheckResponseSchema.parse(await res.json());
+        return data.available ? "available" : "taken";
+      } catch {
+        return "unknown";
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    },
+    []
+  );
 
   const submitProfile = useCallback(
     async (values: FormValues, skip?: boolean) => {
@@ -226,11 +266,31 @@ export default function ProfileSetup() {
         return;
       }
 
+      if (!skip && !values.username?.trim()) {
+        setSubmitError("Username is required unless you skip.");
+        return;
+      }
+
       setSubmitting(true);
       setUploadProgress(0);
       setSubmitError(null);
 
       try {
+        if (!skip && usernameStatus === "unverified" && values.username?.trim()) {
+          const result = await checkUsernameAvailability(values.username, 2500);
+          if (result === "taken") {
+            setUsernameStatus("taken");
+            setUsernameMessage("That username is already taken.");
+            setSubmitError("That username is already taken.");
+            setSubmitting(false);
+            return;
+          }
+          if (result === "available") {
+            setUsernameStatus("available");
+            setUsernameMessage("Username is available.");
+          }
+        }
+
         const payload: ProfileCreatePayload = {
           username: skip ? undefined : values.username,
           stance: values.stance,
@@ -258,7 +318,27 @@ export default function ProfileSetup() {
         setLocation(nextUrl, { replace: true });
       } catch (error) {
         console.error("[ProfileSetup] Failed to create profile", error);
-        setSubmitError("We couldn't create your profile. Try again.");
+        if (isApiError(error)) {
+          const details = error.details as Record<string, unknown> | undefined;
+          const errorCode = typeof details?.error === "string" ? details.error : undefined;
+          if (errorCode === "username_taken") {
+            setUsernameStatus("taken");
+            setUsernameMessage("That username is already taken.");
+            setSubmitError("That username is already taken.");
+          } else if (errorCode === "invalid_username") {
+            setUsernameStatus("invalid");
+            setUsernameMessage("Invalid username format.");
+            setSubmitError("Invalid username format.");
+          } else if (errorCode === "auth_required" || error.code === "UNAUTHORIZED") {
+            setSubmitError("Please sign in again to continue.");
+          } else if (errorCode === "rate_limited" || error.code === "RATE_LIMIT") {
+            setSubmitError("You're moving fast. Take a breather and try again.");
+          } else {
+            setSubmitError(getUserFriendlyMessage(error));
+          }
+        } else {
+          setSubmitError("We couldn't create your profile. Try again.");
+        }
       } finally {
         setSubmitting(false);
       }

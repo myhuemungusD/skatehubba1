@@ -12,7 +12,6 @@
  * - Email signup (newsletter, lower priority)
  */
 
-import BackgroundCarousel from "../components/BackgroundCarousel";
 import EmailSignup from "../components/EmailSignup";
 import { MemberHubHero } from "../sections/home/MemberHubHero";
 import { StatsStrip } from "../sections/home/StatsStrip";
@@ -49,7 +48,7 @@ export default function Home() {
   ];
 
   return (
-    <BackgroundCarousel className="text-white">
+    <div className="text-white">
       <MemberHubHero
         badge={homeContent.hero.badge}
         title={homeContent.hero.title}
@@ -92,6 +91,6 @@ export default function Home() {
           </p>
         </div>
       </footer>
-    </BackgroundCarousel>
+    </div>
   );
 }

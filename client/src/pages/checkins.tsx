@@ -1,30 +1,35 @@
-// client/src/pages/checkins.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { Award, Calendar, ExternalLink, Loader2, MapPin, CheckCircle2 } from "lucide-react";
-
+import {
+  Award,
+  Calendar,
+  ExternalLink,
+  Loader2,
+  MapPin,
+  CheckCircle2,
+  ArrowLeft,
+  Lock,
+  AlertTriangle,
+  Sparkles,
+} from "lucide-react";
 import { useAuth } from "../context/AuthProvider";
 import type { CheckInResult } from "../../../shared/checkin-types";
-
-import Navigation from "../components/Navigation";
-import BackgroundCarousel from "../components/BackgroundCarousel";
-import { Footer } from "../components/Footer";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Footer } from "../components/Footer";
+import { buildApiUrl } from "../lib/api/client";
 
 type LoadState = "idle" | "loading" | "success" | "error";
 
 function normalizeSpotLabel(spotId: string): string {
-  // If spotId is a slug, make it readable; if numeric/string, keep as-is.
   const label = spotId.trim();
   if (!label) return "Unknown spot";
   return label.includes("-") ? label.replace(/-/g, " ") : label;
 }
 
 function safeDate(input: unknown): Date | null {
-  // supports ISO strings; if backend sends invalid, we degrade gracefully.
   if (typeof input !== "string") return null;
   const d = new Date(input);
   return Number.isNaN(d.getTime()) ? null : d;
@@ -43,14 +48,12 @@ export default function CheckinsPage() {
 
   const totalCount = checkins.length;
 
-  // Fetch “my check-ins” (token-scoped) once auth is resolved and user is signed in.
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function run() {
       if (authLoading) return;
 
-      // Not signed in => don’t fetch; show gated UI.
       if (!isAuthenticated || !userId || !user) {
         setState("idle");
         setCheckins([]);
@@ -62,35 +65,40 @@ export default function CheckinsPage() {
       setError(null);
 
       try {
-        // Fetch check-ins from API
-        const res = await fetch("/api/checkins/my", {
+        const token = await user.getIdToken();
+        const res = await fetch(buildApiUrl("/api/checkins/my"), {
           headers: {
-            Authorization: `Bearer ${await user.getIdToken()}`,
+            Authorization: `Bearer ${token}`,
           },
+          signal: controller.signal,
         });
 
         if (!res.ok) {
-          throw new Error("Failed to fetch check-ins");
+          let message = "Failed to fetch check-ins.";
+          try {
+            const payload = await res.json();
+            if (payload?.message) message = String(payload.message);
+          } catch {
+            // Ignore payload parse errors
+          }
+          throw new Error(message);
         }
 
         const data = await res.json();
-        if (cancelled) return;
         setCheckins(Array.isArray(data) ? data : []);
         setState("success");
       } catch (err) {
-        if (cancelled) return;
-
-        // Use error message from response
+        if (controller.signal.aborted) return;
         const message = err instanceof Error ? err.message : "Failed to load check-ins.";
         setError(message);
         setState("error");
       }
     }
 
-    run();
+    void run();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [authLoading, isAuthenticated, user, userId]);
 
@@ -102,10 +110,8 @@ export default function CheckinsPage() {
   const showLoading = authLoading || state === "loading";
 
   return (
-    <BackgroundCarousel className="text-white">
-      <Navigation />
-
-      <div className="min-h-screen pt-24 pb-12">
+    <div className="text-white">
+      <div className="min-h-screen pt-8 pb-12">
         <div className="max-w-4xl mx-auto px-6">
           <Link href="/">
             <Button
@@ -113,10 +119,7 @@ export default function CheckinsPage() {
               className="mb-8 text-gray-400 hover:text-white"
               data-testid="link-back-home"
             >
-              {/* Keep icon local to avoid extra import surface */}
-              <span aria-hidden className="mr-2">
-                ←
-              </span>
+              <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
               Back to Home
             </Button>
           </Link>
@@ -146,9 +149,7 @@ export default function CheckinsPage() {
           ) : !isAuthenticated ? (
             <Card className="bg-black/60 backdrop-blur-md border-zinc-800 border-dashed text-center py-16">
               <CardContent>
-                <div className="text-5xl mb-6" aria-hidden>
-                  🔒
-                </div>
+                <Lock className="mx-auto mb-6 h-12 w-12 text-orange-400" aria-hidden />
                 <h2 className="text-2xl font-bold mb-4">Account Required</h2>
                 <p className="text-gray-400 mb-8 max-w-sm mx-auto">
                   Sign in to view your trick history and track your progression.
@@ -163,9 +164,7 @@ export default function CheckinsPage() {
           ) : state === "error" ? (
             <Card className="bg-red-900/20 backdrop-blur-md border-red-900/50 text-center py-16">
               <CardContent>
-                <div className="text-5xl mb-6" aria-hidden>
-                  ⚠️
-                </div>
+                <AlertTriangle className="mx-auto mb-6 h-12 w-12 text-red-400" aria-hidden />
                 <h2 className="text-2xl font-bold mb-4 text-red-400">Error Loading Data</h2>
                 <p className="text-gray-400 mb-8">{error ?? "Failed to load check-ins."}</p>
                 <Button
@@ -180,9 +179,7 @@ export default function CheckinsPage() {
           ) : totalCount === 0 ? (
             <Card className="bg-black/60 backdrop-blur-md border-zinc-800 border-dashed text-center py-20">
               <CardContent>
-                <div className="text-6xl mb-6" aria-hidden>
-                  🛹
-                </div>
+                <Sparkles className="mx-auto mb-6 h-12 w-12 text-orange-400" aria-hidden />
                 <h2 className="text-2xl font-bold text-white mb-4">No check-ins yet</h2>
                 <p className="text-gray-400 mb-8 text-lg">
                   Go land something and make it official.
@@ -262,6 +259,6 @@ export default function CheckinsPage() {
           </div>
         </div>
       </div>
-    </BackgroundCarousel>
+    </div>
   );
 }

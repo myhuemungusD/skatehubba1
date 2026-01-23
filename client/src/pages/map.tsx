@@ -13,7 +13,6 @@ import {
 import { type Spot, SPOT_TYPES } from "@shared/schema";
 import { AddSpotModal } from "../components/map/AddSpotModal";
 import { SpotDetailModal } from "../components/map/SpotDetailModal";
-import Navigation from "../components/Navigation";
 import { SpotMap } from "../components/SpotMap";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
@@ -333,9 +332,7 @@ export default function MapPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="h-dvh flex flex-col bg-[#181818] overflow-hidden">
-      <Navigation />
-
+    <div className="h-dvh flex flex-col overflow-hidden">
       {/* Full-screen map */}
       <main className="flex-1 relative min-h-0" role="main" aria-label="Skate spots map">
         {isSpotsLoading ? (

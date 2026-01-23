@@ -8,7 +8,6 @@ import { ChallengeButton } from "@/components/skater/ChallengeButton";
 import { ClosetGrid } from "@/components/skater/ClosetGrid";
 import { useAuth } from "@/context/AuthProvider";
 import { useToast } from "@/hooks/use-toast";
-import Navigation from "@/components/Navigation";
 import type { UserProfile, ClosetItem } from "@shared/schema";
 
 export default function SkaterProfile() {
@@ -44,15 +43,12 @@ export default function SkaterProfile() {
 
   if (profileLoading) {
     return (
-      <div className="min-h-screen bg-black">
-        <Navigation />
-        <div className="mx-auto w-full max-w-6xl px-4 pt-8">
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-16 w-16 rounded-full" />
-            <div className="space-y-2">
-              <Skeleton className="h-6 w-48" />
-              <Skeleton className="h-4 w-32" />
-            </div>
+      <div className="mx-auto w-full max-w-6xl px-4 pt-8">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-16 w-16 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-4 w-32" />
           </div>
         </div>
       </div>
@@ -61,28 +57,17 @@ export default function SkaterProfile() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-black">
-        <Navigation />
-        <div className="mx-auto w-full max-w-6xl px-4 pt-8">
-          <Card className="bg-gray-900 border-gray-700 p-8 text-center">
-            <h2 className="text-2xl font-bold text-white mb-2">Profile Not Found</h2>
-            <p className="text-neutral-400">@{handle} doesn't exist yet.</p>
-          </Card>
-        </div>
+      <div className="mx-auto w-full max-w-6xl px-4 pt-8">
+        <Card className="bg-gray-900 border-gray-700 p-8 text-center">
+          <h2 className="text-2xl font-bold text-white mb-2">Profile Not Found</h2>
+          <p className="text-neutral-400">@{handle} doesn't exist yet.</p>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="relative min-h-screen">
-      {/* Background (bedroom graffiti) */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[url('/images/backgrounds/profile-background.png')] bg-cover bg-center brightness-[0.55]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/80" />
-      </div>
-
-      <Navigation />
-
+    <div className="text-white">
       {/* Header / hero */}
       <section className="mx-auto w-full max-w-6xl px-4 pt-8 md:pt-12">
         <div className="flex items-center justify-between gap-4 flex-wrap">

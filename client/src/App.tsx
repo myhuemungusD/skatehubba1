@@ -20,7 +20,7 @@ import { logger } from "./lib/logger";
 
 // Eager load critical pages
 import UnifiedLanding from "./pages/unified-landing";
-import DashboardLayout from "./components/layout/DashboardLayout";
+import AppShell from "./components/layout/AppShell";
 import ProtectedRoute, { type Params } from "./lib/protected-route";
 
 // Lazy load non-critical pages for better performance
@@ -54,6 +54,7 @@ const PrivacyPage = lazy(() => import("./pages/privacy"));
 const TermsPage = lazy(() => import("./pages/terms"));
 const SpecsPage = lazy(() => import("./pages/specs"));
 const CheckinsPage = lazy(() => import("./pages/checkins"));
+const SettingsPage = lazy(() => import("./pages/settings"));
 
 const PublicProfileView = lazy(() => import("./features/social/public-profile/PublicProfileView"));
 const BoltsShowcase = lazy(() => import("./features/social/bolts-showcase/BoltsShowcase"));
@@ -101,69 +102,165 @@ function RootRedirect() {
   return <LoadingScreen />;
 }
 
-function DashboardFeedRoute(_props: { params: Params }) {
+function AppShellHomeRoute() {
   return (
-    <DashboardLayout>
-      <FeedPage />
-    </DashboardLayout>
+    <AppShell>
+      <Home />
+    </AppShell>
   );
 }
 
-function DashboardMapRoute(_props: { params: Params }) {
+function AppShellShopRoute() {
   return (
-    <DashboardLayout>
-      <MapPage />
-    </DashboardLayout>
+    <AppShell>
+      <ShopPage />
+    </AppShell>
   );
 }
 
-function DashboardSpotDetailRoute(props: { params: Params }) {
+function AppShellCartRoute() {
   return (
-    <DashboardLayout>
-      <SpotDetailPage params={props.params} />
-    </DashboardLayout>
+    <AppShell>
+      <CartPage />
+    </AppShell>
   );
 }
 
-function DashboardSkateGameRoute(_props: { params: Params }) {
+function AppShellCheckoutRoute() {
   return (
-    <DashboardLayout>
+    <AppShell>
+      <CheckoutPage />
+    </AppShell>
+  );
+}
+
+function AppShellOrderConfirmationRoute() {
+  return (
+    <AppShell>
+      <OrderConfirmationPage />
+    </AppShell>
+  );
+}
+
+function AppShellClosetRoute() {
+  return (
+    <AppShell>
+      <ClosetPage />
+    </AppShell>
+  );
+}
+
+function AppShellChallengeLobbyRoute() {
+  return (
+    <AppShell>
+      <ChallengeLobbyPage />
+    </AppShell>
+  );
+}
+
+function AppShellActiveGameRoute() {
+  return (
+    <AppShell>
       <SkateGamePage />
-    </DashboardLayout>
+    </AppShell>
   );
 }
 
-function DashboardLeaderboardRoute(_props: { params: Params }) {
+function AppShellFeedRoute(_props: { params: Params }) {
   return (
-    <DashboardLayout>
+    <AppShell>
+      <FeedPage />
+    </AppShell>
+  );
+}
+
+function AppShellMapRoute(_props: { params: Params }) {
+  return (
+    <AppShell>
+      <MapPage />
+    </AppShell>
+  );
+}
+
+function AppShellSpotDetailRoute(props: { params: Params }) {
+  return (
+    <AppShell>
+      <SpotDetailPage params={props.params} />
+    </AppShell>
+  );
+}
+
+function AppShellSkateGameRoute(_props: { params: Params }) {
+  return (
+    <AppShell>
+      <SkateGamePage />
+    </AppShell>
+  );
+}
+
+function AppShellLeaderboardRoute(_props: { params: Params }) {
+  return (
+    <AppShell>
       <LeaderboardPage />
-    </DashboardLayout>
+    </AppShell>
   );
 }
 
-function DashboardTrickmintRoute(_props: { params: Params }) {
+function AppShellTrickmintRoute(_props: { params: Params }) {
   return (
-    <DashboardLayout>
+    <AppShell>
       <TrickMintPage />
-    </DashboardLayout>
+    </AppShell>
   );
 }
 
-function DashboardTutorialRoute(_props: { params: Params }) {
+function AppShellTutorialRoute(_props: { params: Params }) {
   const { user } = useAuth();
   const userId = user!.uid;
   return (
-    <DashboardLayout>
+    <AppShell>
       <Tutorial userId={userId} />
-    </DashboardLayout>
+    </AppShell>
   );
 }
 
-function DashboardCheckinsRoute(_props: { params: Params }) {
+function AppShellCheckinsRoute(_props: { params: Params }) {
   return (
-    <DashboardLayout>
+    <AppShell>
       <CheckinsPage />
-    </DashboardLayout>
+    </AppShell>
+  );
+}
+
+function AppShellSkaterProfileRoute(_props: { params: Params }) {
+  return (
+    <AppShell>
+      <SkaterProfilePage />
+    </AppShell>
+  );
+}
+
+function AppShellPublicProfileRoute(_props: { params: Params }) {
+  return (
+    <AppShell>
+      <PublicProfileView />
+    </AppShell>
+  );
+}
+
+function AppShellShowcaseRoute() {
+  return (
+    <AppShell>
+      <BoltsShowcase />
+    </AppShell>
+  );
+}
+
+function AppShellSettingsRoute() {
+  return (
+    <AppShell>
+      <SettingsPage />
+    </AppShell>
   );
 }
 
@@ -195,17 +292,17 @@ function AppRoutes() {
       <Switch>
         <Route path="/auth" component={AuthPage} />
         <Route path="/login" component={LoginPage} />
-        <Route path="/home" component={Home} />
+        <Route path="/home" component={AppShellHomeRoute} />
         <Route path="/landing" component={UnifiedLanding} />
         <Route path="/new-landing" component={UnifiedLanding} />
         <Route path="/demo" component={Demo} />
-        <Route path="/shop" component={ShopPage} />
-        <Route path="/cart" component={CartPage} />
-        <Route path="/checkout" component={CheckoutPage} />
-        <Route path="/order-confirmation" component={OrderConfirmationPage} />
-        <Route path="/closet" component={ClosetPage} />
-        <Route path="/game/active" component={SkateGamePage} />
-        <Route path="/game" component={ChallengeLobbyPage} />
+        <Route path="/shop" component={AppShellShopRoute} />
+        <Route path="/cart" component={AppShellCartRoute} />
+        <Route path="/checkout" component={AppShellCheckoutRoute} />
+        <Route path="/order-confirmation" component={AppShellOrderConfirmationRoute} />
+        <Route path="/closet" component={AppShellClosetRoute} />
+        <Route path="/game/active" component={AppShellActiveGameRoute} />
+        <Route path="/game" component={AppShellChallengeLobbyRoute} />
         <Route path="/signup" component={SignupPage} />
         <Route path="/signin" component={SigninPage} />
         <Route path="/profile-setup" component={ProfileSetup} />
@@ -216,20 +313,21 @@ function AppRoutes() {
         <Route path="/privacy" component={PrivacyPage} />
         <Route path="/terms" component={TermsPage} />
         <Route path="/specs" component={SpecsPage} />
-        <Route path="/skater/:handle" component={SkaterProfilePage} />
-        <Route path="/p/:username" component={PublicProfileView} />
-        <Route path="/showcase" component={BoltsShowcase} />
+        <Route path="/skater/:handle" component={AppShellSkaterProfileRoute} />
+        <Route path="/p/:username" component={AppShellPublicProfileRoute} />
+        <Route path="/showcase" component={AppShellShowcaseRoute} />
         <Route path="/profile/setup" component={ProfileSetupRoute} />
+        <Route path="/settings" component={AppShellSettingsRoute} />
 
-        <ProtectedRoute path="/dashboard" component={DashboardFeedRoute} />
-        <ProtectedRoute path="/feed" component={DashboardFeedRoute} />
-        <ProtectedRoute path="/map" component={DashboardMapRoute} />
-        <ProtectedRoute path="/spots/:id" component={DashboardSpotDetailRoute} />
-        <ProtectedRoute path="/skate-game" component={DashboardSkateGameRoute} />
-        <ProtectedRoute path="/leaderboard" component={DashboardLeaderboardRoute} />
-        <ProtectedRoute path="/trickmint" component={DashboardTrickmintRoute} />
-        <ProtectedRoute path="/tutorial" component={DashboardTutorialRoute} />
-        <ProtectedRoute path="/checkins" component={DashboardCheckinsRoute} />
+        <ProtectedRoute path="/dashboard" component={AppShellFeedRoute} />
+        <ProtectedRoute path="/feed" component={AppShellFeedRoute} />
+        <ProtectedRoute path="/map" component={AppShellMapRoute} />
+        <ProtectedRoute path="/spots/:id" component={AppShellSpotDetailRoute} />
+        <ProtectedRoute path="/skate-game" component={AppShellSkateGameRoute} />
+        <ProtectedRoute path="/leaderboard" component={AppShellLeaderboardRoute} />
+        <ProtectedRoute path="/trickmint" component={AppShellTrickmintRoute} />
+        <ProtectedRoute path="/tutorial" component={AppShellTutorialRoute} />
+        <ProtectedRoute path="/checkins" component={AppShellCheckinsRoute} />
 
         <Route path="/" component={RootRedirect} />
       </Switch>

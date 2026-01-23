@@ -46,7 +46,10 @@ export async function requireFirebaseUid(
     const match = header.match(/^Bearer (.+)$/);
 
     if (!match) {
-      res.status(401).json({ error: "missing_bearer_token" });
+      res.status(401).json({
+        error: "auth_required",
+        message: "Authorization token missing.",
+      });
       return;
     }
 
@@ -63,7 +66,10 @@ export async function requireFirebaseUid(
   } catch (error) {
     // Don't leak error details to client
     console.error("[FirebaseAuth] Token verification failed:", error);
-    res.status(401).json({ error: "invalid_token" });
+    res.status(401).json({
+      error: "auth_required",
+      message: "Invalid or expired token.",
+    });
   }
 }
 
