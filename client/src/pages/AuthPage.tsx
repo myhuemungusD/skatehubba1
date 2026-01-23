@@ -220,7 +220,7 @@ export default function AuthPage() {
         title: "Welcome! 🛹",
         description: "You have successfully signed in with Google.",
       });
-      setLocation("/dashboard");
+      setLocation(getNextUrl());
     } catch (error) {
       const message = error instanceof Error ? error.message : "Google sign in failed";
       toast({
