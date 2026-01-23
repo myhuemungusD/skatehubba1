@@ -1,18 +1,9 @@
 import { createRoot } from "react-dom/client";
-import { getMissingPublicEnvVars } from "@skatehubba/config";
+import { getMissingRequiredEnv } from "./env";
 import EnvErrorScreen from "./components/EnvErrorScreen";
 import "./index.css";
 import "./sentry";
 import "./vitals";
-
-const REQUIRED_ENV = [
-  "VITE_FIREBASE_API_KEY",
-  "VITE_FIREBASE_AUTH_DOMAIN",
-  "VITE_FIREBASE_PROJECT_ID",
-  "VITE_FIREBASE_STORAGE_BUCKET",
-  "VITE_FIREBASE_MESSAGING_SENDER_ID",
-  "VITE_FIREBASE_APP_ID",
-];
 
 const rootElement = document.getElementById("root");
 if (!rootElement) {
@@ -20,7 +11,7 @@ if (!rootElement) {
 }
 
 const root = createRoot(rootElement);
-const missing = getMissingPublicEnvVars(REQUIRED_ENV);
+const missing = getMissingRequiredEnv();
 
 if (missing.length > 0) {
   root.render(<EnvErrorScreen missingKeys={missing} />);
