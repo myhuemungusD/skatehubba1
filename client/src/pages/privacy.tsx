@@ -1,55 +1,62 @@
-import { useEffect } from 'react';
-import { Link } from 'wouter';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { ArrowLeft, Shield, Eye, Lock, Database, UserCheck, Mail } from 'lucide-react';
+import { useEffect } from "react";
+import { Link } from "wouter";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { ArrowLeft, Shield, Eye, Lock, Database, UserCheck, Mail } from "lucide-react";
 
 export default function PrivacyPage() {
   useEffect(() => {
-    const title = 'Privacy Policy - SkateHubba';
-    const description = 'Learn how SkateHubba collects, uses, and protects your personal information. Our privacy policy covers data security, user rights, and GDPR/CCPA compliance.';
-    const url = 'https://skatehubba.com/privacy';
+    const title = "Privacy Policy - SkateHubba";
+    const description =
+      "Learn how SkateHubba collects, uses, and protects your personal information. Our privacy policy covers data security, user rights, and GDPR/CCPA compliance.";
+    const url = "https://skatehubba.com/privacy";
 
     document.title = title;
-    
-    const metaDescription = document.querySelector('meta[name="description"]') || document.createElement('meta');
-    metaDescription.setAttribute('name', 'description');
-    metaDescription.setAttribute('content', description);
+
+    const metaDescription =
+      document.querySelector('meta[name="description"]') || document.createElement("meta");
+    metaDescription.setAttribute("name", "description");
+    metaDescription.setAttribute("content", description);
     if (!document.querySelector('meta[name="description"]')) {
       document.head.appendChild(metaDescription);
     }
 
-    const ogTitle = document.querySelector('meta[property="og:title"]') || document.createElement('meta');
-    ogTitle.setAttribute('property', 'og:title');
-    ogTitle.setAttribute('content', title);
+    const ogTitle =
+      document.querySelector('meta[property="og:title"]') || document.createElement("meta");
+    ogTitle.setAttribute("property", "og:title");
+    ogTitle.setAttribute("content", title);
     if (!document.querySelector('meta[property="og:title"]')) {
       document.head.appendChild(ogTitle);
     }
 
-    const ogDescription = document.querySelector('meta[property="og:description"]') || document.createElement('meta');
-    ogDescription.setAttribute('property', 'og:description');
-    ogDescription.setAttribute('content', description);
+    const ogDescription =
+      document.querySelector('meta[property="og:description"]') || document.createElement("meta");
+    ogDescription.setAttribute("property", "og:description");
+    ogDescription.setAttribute("content", description);
     if (!document.querySelector('meta[property="og:description"]')) {
       document.head.appendChild(ogDescription);
     }
 
-    const ogUrl = document.querySelector('meta[property="og:url"]') || document.createElement('meta');
-    ogUrl.setAttribute('property', 'og:url');
-    ogUrl.setAttribute('content', url);
+    const ogUrl =
+      document.querySelector('meta[property="og:url"]') || document.createElement("meta");
+    ogUrl.setAttribute("property", "og:url");
+    ogUrl.setAttribute("content", url);
     if (!document.querySelector('meta[property="og:url"]')) {
       document.head.appendChild(ogUrl);
     }
 
-    const ogType = document.querySelector('meta[property="og:type"]') || document.createElement('meta');
-    ogType.setAttribute('property', 'og:type');
-    ogType.setAttribute('content', 'website');
+    const ogType =
+      document.querySelector('meta[property="og:type"]') || document.createElement("meta");
+    ogType.setAttribute("property", "og:type");
+    ogType.setAttribute("content", "website");
     if (!document.querySelector('meta[property="og:type"]')) {
       document.head.appendChild(ogType);
     }
 
-    const ogImage = document.querySelector('meta[property="og:image"]') || document.createElement('meta');
-    ogImage.setAttribute('property', 'og:image');
-    ogImage.setAttribute('content', 'https://skatehubba.com/skatehubba-og.png');
+    const ogImage =
+      document.querySelector('meta[property="og:image"]') || document.createElement("meta");
+    ogImage.setAttribute("property", "og:image");
+    ogImage.setAttribute("content", "https://skatehubba.com/images/og/skatehubba-og.png");
     if (!document.querySelector('meta[property="og:image"]')) {
       document.head.appendChild(ogImage);
     }
@@ -91,7 +98,9 @@ export default function PrivacyPage() {
                 Introduction
               </h2>
               <p className="text-muted-foreground">
-                SkateHubba ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile skateboarding platform.
+                SkateHubba ("we," "our," or "us") is committed to protecting your privacy. This
+                Privacy Policy explains how we collect, use, disclose, and safeguard your
+                information when you use our mobile skateboarding platform.
               </p>
             </section>
 
@@ -100,7 +109,7 @@ export default function PrivacyPage() {
                 <Database className="h-6 w-6 text-primary" />
                 Information We Collect
               </h2>
-              
+
               <h3 className="text-xl font-semibold text-foreground mt-4">Personal Information</h3>
               <ul className="list-disc list-inside space-y-2 text-muted-foreground">
                 <li>Account information (email, name, phone number)</li>
@@ -159,10 +168,21 @@ export default function PrivacyPage() {
               </h2>
               <p className="text-muted-foreground">We may share your information with:</p>
               <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-                <li><strong>Service Providers:</strong> Firebase (auth), Stripe (payments), OpenAI (AI chat), Neon (database)</li>
-                <li><strong>Other Users:</strong> Public profile information, leaderboard stats, and content you choose to share</li>
-                <li><strong>Legal Requirements:</strong> When required by law or to protect our rights</li>
-                <li><strong>Business Transfers:</strong> In connection with a merger, sale, or acquisition</li>
+                <li>
+                  <strong>Service Providers:</strong> Firebase (auth), Stripe (payments), OpenAI (AI
+                  chat), Neon (database)
+                </li>
+                <li>
+                  <strong>Other Users:</strong> Public profile information, leaderboard stats, and
+                  content you choose to share
+                </li>
+                <li>
+                  <strong>Legal Requirements:</strong> When required by law or to protect our rights
+                </li>
+                <li>
+                  <strong>Business Transfers:</strong> In connection with a merger, sale, or
+                  acquisition
+                </li>
               </ul>
               <p className="text-muted-foreground mt-4">
                 We <strong>never sell</strong> your personal information to third parties.
@@ -195,28 +215,37 @@ export default function PrivacyPage() {
                 <li>Object to processing</li>
               </ul>
               <p className="text-muted-foreground mt-4">
-                To exercise these rights, contact us at <a href="mailto:privacy@skatehubba.com" className="text-primary hover:underline">privacy@skatehubba.com</a>
+                To exercise these rights, contact us at{" "}
+                <a href="mailto:privacy@skatehubba.com" className="text-primary hover:underline">
+                  privacy@skatehubba.com
+                </a>
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-foreground">Children's Privacy</h2>
               <p className="text-muted-foreground">
-                SkateHubba is not intended for children under 13. We do not knowingly collect personal information from children under 13. If you are a parent or guardian and believe your child has provided us with personal information, please contact us.
+                SkateHubba is not intended for children under 13. We do not knowingly collect
+                personal information from children under 13. If you are a parent or guardian and
+                believe your child has provided us with personal information, please contact us.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-foreground">International Users</h2>
               <p className="text-muted-foreground">
-                Your information may be transferred to and processed in the United States and other countries. By using SkateHubba, you consent to the transfer of your information to countries outside your country of residence.
+                Your information may be transferred to and processed in the United States and other
+                countries. By using SkateHubba, you consent to the transfer of your information to
+                countries outside your country of residence.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-foreground">Changes to This Policy</h2>
               <p className="text-muted-foreground">
-                We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.
+                We may update this Privacy Policy from time to time. We will notify you of any
+                changes by posting the new Privacy Policy on this page and updating the "Last
+                updated" date.
               </p>
             </section>
 
@@ -229,14 +258,25 @@ export default function PrivacyPage() {
                 If you have questions about this Privacy Policy, please contact us:
               </p>
               <ul className="list-none space-y-2 text-muted-foreground mt-4">
-                <li><strong>Email:</strong> <a href="mailto:privacy@skatehubba.com" className="text-primary hover:underline">privacy@skatehubba.com</a></li>
-                <li><strong>Support:</strong> <a href="mailto:support@skatehubba.com" className="text-primary hover:underline">support@skatehubba.com</a></li>
+                <li>
+                  <strong>Email:</strong>{" "}
+                  <a href="mailto:privacy@skatehubba.com" className="text-primary hover:underline">
+                    privacy@skatehubba.com
+                  </a>
+                </li>
+                <li>
+                  <strong>Support:</strong>{" "}
+                  <a href="mailto:support@skatehubba.com" className="text-primary hover:underline">
+                    support@skatehubba.com
+                  </a>
+                </li>
               </ul>
             </section>
 
             <div className="mt-8 p-6 bg-primary/10 border border-primary/20 rounded-lg">
               <p className="text-sm text-muted-foreground">
-                By using SkateHubba, you acknowledge that you have read and understood this Privacy Policy and agree to its terms.
+                By using SkateHubba, you acknowledge that you have read and understood this Privacy
+                Policy and agree to its terms.
               </p>
             </div>
           </CardContent>

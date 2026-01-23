@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Firebase Configuration
  *
  * Centralized Firebase config that works for both web and mobile.
@@ -22,6 +22,10 @@ export interface FirebaseConfig {
   measurementId?: string;
 }
 
+export interface GetFirebaseConfigOptions {
+  allowLocalFallback?: boolean;
+}
+
 /**
  * Production config
  *
@@ -36,7 +40,7 @@ export interface FirebaseConfig {
  * for misconfigured local environments only.
  */
 const PRODUCTION_CONFIG: FirebaseConfig = {
-  apiKey: getPublicEnvOptional("EXPO_PUBLIC_FIREBASE_API_KEY_PROD") ?? "DUMMY_FIREBASE_API_KEY",
+  apiKey: "AIzaSyD6kLt4GKV4adX-oQ3m_aXIpL6GXBP0xZw",
   authDomain: "sk8hub-d7806.firebaseapp.com",
   projectId: "sk8hub-d7806",
   storageBucket: "sk8hub-d7806.firebasestorage.app",
@@ -65,7 +69,7 @@ const STAGING_CONFIG: FirebaseConfig = {
  *
  * Uses env vars if available, falls back to hardcoded config
  */
-export function getFirebaseConfig(): FirebaseConfig {
+export function getFirebaseConfig(_options: GetFirebaseConfigOptions = {}): FirebaseConfig {
   const env = getAppEnv();
 
   // Try to read from env vars first (allows override)
@@ -99,10 +103,10 @@ export function getFirebaseConfig(): FirebaseConfig {
   // Fall back to hardcoded config based on environment
   switch (env) {
     case "prod":
-      console.log("[Firebase] Using hardcoded prod config");
+      console.warn("[Firebase] Missing env config; using hardcoded prod config");
       return PRODUCTION_CONFIG;
     case "staging":
-      console.log("[Firebase] Using hardcoded staging config");
+      console.warn("[Firebase] Missing env config; using hardcoded staging config");
       return STAGING_CONFIG;
     default:
       console.log("[Firebase] Using hardcoded config for local dev");

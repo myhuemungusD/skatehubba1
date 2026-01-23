@@ -10,10 +10,10 @@
  * ## Quick Start
  *
  * ```typescript
- * import { getAppEnv, getFirebaseConfig, assertEnvWiring } from '@skatehubba/config';
+ * import { getAppEnv, getFirebaseConfig, validateEnv } from '@skatehubba/config';
  *
  * // Validate environment at startup
- * assertEnvWiring();
+ * validateEnv();
  *
  * // Get current environment
  * const env = getAppEnv(); // 'prod' | 'staging' | 'local'
@@ -34,16 +34,27 @@
  * @module @skatehubba/config
  */
 
-// Environment utilities
+// Universal environment adapter (NEW - USE THIS!)
 export {
-  getPublicEnv,
-  getPublicEnvOptional,
+  getEnv,
+  getEnvOptional,
+  getEnvBool,
+  getEnvNumber,
   getAppEnv,
   isProd,
   isStaging,
   isLocal,
+  getFirebaseEnv,
+  getApiEnv,
+  getAppConfig,
+  getFeatureFlags,
+  validateEnv,
+  isDebugMode,
   type AppEnv,
-} from "./publicEnv";
+} from "./env";
+
+// Legacy environment utilities (deprecated - use env.ts instead)
+export { getPublicEnv, getPublicEnvOptional, getMissingPublicEnvVars } from "./publicEnv";
 
 // Runtime utilities
 export {

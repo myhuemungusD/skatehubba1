@@ -16,17 +16,17 @@ import { setAuthPersistence } from "../lib/firebase";
  * Google blocks OAuth in these webviews for security reasons
  */
 function isEmbeddedBrowser(): boolean {
-  const ua = navigator.userAgent || navigator.vendor || '';
+  const ua = navigator.userAgent || navigator.vendor || "";
   return (
-    ua.includes('FBAN') || // Facebook App
-    ua.includes('FBAV') || // Facebook App
-    ua.includes('Instagram') ||
-    ua.includes('Twitter') ||
-    ua.includes('Line/') ||
-    ua.includes('KAKAOTALK') ||
-    ua.includes('Snapchat') ||
-    ua.includes('TikTok') ||
-    (ua.includes('wv') && ua.includes('Android')) // Android WebView
+    ua.includes("FBAN") || // Facebook App
+    ua.includes("FBAV") || // Facebook App
+    ua.includes("Instagram") ||
+    ua.includes("Twitter") ||
+    ua.includes("Line/") ||
+    ua.includes("KAKAOTALK") ||
+    ua.includes("Snapchat") ||
+    ua.includes("TikTok") ||
+    (ua.includes("wv") && ua.includes("Android")) // Android WebView
   );
 }
 
@@ -40,37 +40,71 @@ export default function LoginPage() {
   const [inEmbeddedBrowser, setInEmbeddedBrowser] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Parse ?next= param for redirect after login
+  const getNextUrl = (): string => {
+    if (typeof window === "undefined") return "/home";
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next) {
+      try {
+        const decoded = decodeURIComponent(next);
+        // Security: only allow relative paths
+        if (decoded.startsWith("/") && !decoded.startsWith("//")) {
+          return decoded;
+        }
+      } catch {
+        // Invalid encoding
+      }
+    }
+    return "/home";
+  };
+
   // Check for embedded browser on mount
   useEffect(() => {
     const isEmbedded = isEmbeddedBrowser();
     setInEmbeddedBrowser(isEmbedded);
-    console.log('[Login] User agent:', navigator.userAgent);
-    console.log('[Login] Is embedded browser:', isEmbedded);
+    console.log("[Login] User agent:", navigator.userAgent);
+    console.log("[Login] Is embedded browser:", isEmbedded);
   }, []);
 
-  // Redirect when authenticated
+  // Redirect when authenticated and profile status is known
   useEffect(() => {
-    if (auth?.user) {
-      setLocation("/home");
+    // Wait for profile status to be determined (not "unknown")
+    if (!auth?.user || auth?.profileStatus === "unknown") return;
+
+    if (auth.profileStatus === "exists") {
+      setLocation(getNextUrl());
+    } else if (auth.profileStatus === "missing") {
+      // Preserve next param when redirecting to profile setup
+      const nextUrl = getNextUrl();
+      const setupUrl =
+        nextUrl !== "/home"
+          ? `/profile/setup?next=${encodeURIComponent(nextUrl)}`
+          : "/profile/setup";
+      setLocation(setupUrl);
     }
-  }, [auth?.user, setLocation]);
+  }, [auth?.user, auth?.profileStatus, setLocation]);
 
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
       // Set persistence before signing in
       await setAuthPersistence(rememberMe);
-      await auth?.signInWithGoogle();
+      await auth?.signInGoogle();
       toast({
         title: "Welcome! 🛹",
-        description: "You've successfully signed in with Google."
+        description: "You've successfully signed in with Google.",
       });
-      trackEvent('login', { method: 'google', rememberMe });
-    } catch (err: any) {
-      toast({ 
-        title: "Google sign-in failed", 
-        description: err.message || "Login failed",
-        variant: "destructive"
+      trackEvent("login", { method: "google", rememberMe });
+    } catch (err: unknown) {
+      const rawMessage = err instanceof Error ? err.message : "Login failed";
+      const message = rawMessage.includes("disallowed_useragent")
+        ? "Google Sign-In is blocked in embedded browsers. Open SkateHubba in Safari or Chrome."
+        : rawMessage;
+      toast({
+        title: "Google sign-in failed",
+        description: message,
+        variant: "destructive",
       });
       setIsGoogleLoading(false);
     }
@@ -81,17 +115,18 @@ export default function LoginPage() {
     try {
       // Set persistence before signing in
       await setAuthPersistence(rememberMe);
-      await auth?.signInAnonymously();
+      await auth?.signInAnon();
       toast({
         title: "Welcome! 🛹",
-        description: "You've signed in as a guest."
+        description: "You've signed in as a guest.",
       });
-      trackEvent('login', { method: 'anonymous', rememberMe });
-    } catch (err: any) {
-      toast({ 
-        title: "Guest sign-in failed", 
-        description: err.message || "Login failed",
-        variant: "destructive"
+      trackEvent("login", { method: "anonymous", rememberMe });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Login failed";
+      toast({
+        title: "Guest sign-in failed",
+        description: message,
+        variant: "destructive",
       });
       setIsAnonymousLoading(false);
     }
@@ -127,10 +162,7 @@ export default function LoginPage() {
                 onCheckedChange={(checked) => setRememberMe(checked === true)}
                 className="border-gray-500 data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
               />
-              <Label
-                htmlFor="rememberMe"
-                className="text-sm text-gray-300 cursor-pointer"
-              >
+              <Label htmlFor="rememberMe" className="text-sm text-gray-300 cursor-pointer">
                 Keep me signed in
               </Label>
             </div>
@@ -155,23 +187,19 @@ export default function LoginPage() {
                       setCopied(true);
                       toast({
                         title: "Link copied!",
-                        description: "Paste it in Safari or Chrome to sign in with Google."
+                        description: "Paste it in Safari or Chrome to sign in with Google.",
                       });
                       setTimeout(() => setCopied(false), 2000);
                     } catch {
                       // Fallback for browsers that don't support clipboard API
                       toast({
                         title: "Copy this link",
-                        description: window.location.href
+                        description: window.location.href,
                       });
                     }
                   }}
                 >
-                  {copied ? (
-                    <Check className="w-4 h-4 mr-2" />
-                  ) : (
-                    <Copy className="w-4 h-4 mr-2" />
-                  )}
+                  {copied ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
                   {copied ? "Copied!" : "Copy Link"}
                 </Button>
               </div>
@@ -182,7 +210,7 @@ export default function LoginPage() {
               onClick={handleGoogleSignIn}
               disabled={isLoading || inEmbeddedBrowser}
               className={`w-full bg-white hover:bg-gray-100 text-black font-semibold flex items-center justify-center gap-2 h-12 ${
-                inEmbeddedBrowser ? 'opacity-50 cursor-not-allowed' : ''
+                inEmbeddedBrowser ? "opacity-50 cursor-not-allowed" : ""
               }`}
               data-testid="button-google-signin"
             >
@@ -213,9 +241,7 @@ export default function LoginPage() {
 
             {/* Link to Full Auth Page */}
             <div className="text-center mt-6 pt-4 border-t border-gray-700">
-              <p className="text-sm text-gray-400 mb-2">
-                Need to create an account?
-              </p>
+              <p className="text-sm text-gray-400 mb-2">Need to create an account?</p>
               <Button
                 onClick={() => setLocation("/auth")}
                 variant="link"

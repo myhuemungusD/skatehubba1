@@ -1,9 +1,23 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { MapPin, Navigation } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { useToast } from "../../hooks/use-toast";
+import L from "leaflet";
+
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+if (typeof window !== "undefined") {
+  delete (L.Icon.Default.prototype as any)._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconUrl: markerIcon,
+    iconRetinaUrl: markerIcon2x,
+    shadowUrl: markerShadow,
+  });
+}
 
 // Define location type
 export interface Location {
@@ -17,64 +31,22 @@ interface LocationPickerProps {
   initialLocation?: Location;
 }
 
-// Dynamic imports for Leaflet to avoid SSR issues
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let MapContainer: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let TileLayer: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let Marker: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let useMapEvents: any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let L: any;
-
-const loadLeaflet = async () => {
-  if (typeof window === "undefined") return;
-  
-  const leaflet = await import("leaflet");
-  const reactLeaflet = await import("react-leaflet");
-  
-  L = leaflet.default;
-  MapContainer = reactLeaflet.MapContainer;
-  TileLayer = reactLeaflet.TileLayer;
-  Marker = reactLeaflet.Marker;
-  useMapEvents = reactLeaflet.useMapEvents;
-
-  // Fix default marker icon issue with webpack
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  delete (L.Icon.Default.prototype as any)._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  });
-};
-
 // Los Angeles default location
 const DEFAULT_CENTER: Location = { lat: 34.0522, lng: -118.2437, address: "Los Angeles, CA" };
-
-function MapClickHandler({ onLocationClick }: { onLocationClick: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    click: (e: any) => {
-      onLocationClick(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
 
 export default function LocationPicker({ onLocationSelect, initialLocation }: LocationPickerProps) {
   const { toast } = useToast();
   const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState<Location>(initialLocation || DEFAULT_CENTER);
+  const [selectedLocation, setSelectedLocation] = useState<Location>(
+    initialLocation || DEFAULT_CENTER
+  );
   const [manualLat, setManualLat] = useState(initialLocation?.lat.toString() || "");
   const [manualLng, setManualLng] = useState(initialLocation?.lng.toString() || "");
   const [isGettingLocation, setIsGettingLocation] = useState(false);
 
-  useEffect(() => {
-    loadLeaflet().then(() => setLeafletLoaded(true));
-  }, []);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
 
   const handleLocationClick = (lat: number, lng: number) => {
     const newLocation: Location = {
@@ -88,9 +60,59 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
     onLocationSelect(newLocation);
   };
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    let isMounted = true;
+
+    const initMap = async () => {
+      try {
+        await import("leaflet/dist/leaflet.css");
+
+        if (!isMounted || !mapContainerRef.current || mapRef.current) return;
+
+        const map = L.map(mapContainerRef.current, {
+          center: [selectedLocation.lat, selectedLocation.lng],
+          zoom: 13,
+          scrollWheelZoom: true,
+          zoomControl: true,
+        });
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          maxZoom: 19,
+        }).addTo(map);
+
+        markerRef.current = L.marker([selectedLocation.lat, selectedLocation.lng]).addTo(map);
+
+        map.on("click", (e: L.LeafletMouseEvent) => {
+          handleLocationClick(e.latlng.lat, e.latlng.lng);
+        });
+
+        mapRef.current = map;
+        setLeafletLoaded(true);
+      } catch (error) {
+        console.error("Failed to initialize Leaflet map", error);
+      }
+    };
+
+    void initMap();
+
+    return () => {
+      isMounted = false;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      markerRef.current = null;
+    };
+  }, []);
+
   const getCurrentLocation = () => {
     setIsGettingLocation(true);
-    
+
     if (!navigator.geolocation) {
       toast({
         title: "Geolocation not supported",
@@ -162,6 +184,12 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
     [selectedLocation]
   );
 
+  useEffect(() => {
+    if (!mapRef.current || !markerRef.current) return;
+    markerRef.current.setLatLng(markerPosition);
+    mapRef.current.setView(markerPosition, mapRef.current.getZoom(), { animate: true });
+  }, [markerPosition]);
+
   if (!leafletLoaded) {
     return (
       <div className="w-full h-[400px] bg-[#232323] rounded-lg flex items-center justify-center border border-gray-700">
@@ -193,26 +221,17 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
       </div>
 
       {/* Leaflet Map */}
-      <div className="w-full h-[400px] rounded-lg overflow-hidden border-2 border-gray-700">
-        <MapContainer
-          center={markerPosition}
-          zoom={13}
-          style={{ height: "100%", width: "100%" }}
-          key={`${markerPosition[0]}-${markerPosition[1]}`}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Marker position={markerPosition} />
-          <MapClickHandler onLocationClick={handleLocationClick} />
-        </MapContainer>
-      </div>
+      <div
+        ref={mapContainerRef}
+        className="w-full h-[400px] rounded-lg overflow-hidden border-2 border-gray-700"
+      />
 
       {/* Manual Coordinate Entry */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="lat" className="text-white">Latitude</Label>
+          <Label htmlFor="lat" className="text-white">
+            Latitude
+          </Label>
           <Input
             id="lat"
             type="number"
@@ -224,7 +243,9 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="lng" className="text-white">Longitude</Label>
+          <Label htmlFor="lng" className="text-white">
+            Longitude
+          </Label>
           <Input
             id="lng"
             type="number"
@@ -248,7 +269,9 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
 
       {selectedLocation && (
         <div className="text-sm text-gray-400 text-center p-2 bg-[#232323] rounded border border-gray-700">
-          Selected: {selectedLocation.address || `${selectedLocation.lat.toFixed(6)}, ${selectedLocation.lng.toFixed(6)}`}
+          Selected:{" "}
+          {selectedLocation.address ||
+            `${selectedLocation.lat.toFixed(6)}, ${selectedLocation.lng.toFixed(6)}`}
         </div>
       )}
 

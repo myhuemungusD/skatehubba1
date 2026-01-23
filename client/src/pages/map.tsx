@@ -1,17 +1,26 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { MapPin, Navigation as NavigationIcon, AlertCircle, Plus, Clock, Eye, Search, Loader2 } from 'lucide-react';
-import { type Spot, SPOT_TYPES } from '@shared/schema';
-import { AddSpotModal } from '../components/map/AddSpotModal';
-import { SpotDetailModal } from '../components/map/SpotDetailModal';
-import Navigation from '../components/Navigation';
-import { SpotMap } from '../components/SpotMap';
-import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
-import { useToast } from '../hooks/use-toast';
-import { useGeolocation } from '../hooks/useGeolocation';
-import { calculateDistance, getProximity } from '../lib/distance';
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  MapPin,
+  Navigation as NavigationIcon,
+  AlertCircle,
+  Plus,
+  Clock,
+  Eye,
+  Search,
+  Loader2,
+} from "lucide-react";
+import { type Spot, SPOT_TYPES } from "@shared/schema";
+import { AddSpotModal } from "../components/map/AddSpotModal";
+import { SpotDetailModal } from "../components/map/SpotDetailModal";
+import Navigation from "../components/Navigation";
+import { SpotMap } from "../components/SpotMap";
+import { Button } from "../components/ui/button";
+import { Card, CardContent } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { useToast } from "../hooks/use-toast";
+import { useGeolocation } from "../hooks/useGeolocation";
+import { calculateDistance, getProximity } from "../lib/distance";
 
 // ============================================================================
 // TYPES
@@ -19,7 +28,7 @@ import { calculateDistance, getProximity } from '../lib/distance';
 
 type SpotWithDistance = Spot & {
   distance: number | null;
-  proximity: 'here' | 'nearby' | 'far' | null;
+  proximity: "here" | "nearby" | "far" | null;
 };
 
 type UserLocation = {
@@ -51,9 +60,9 @@ export default function MapPage() {
   const { toast } = useToast();
   const [selectedSpotId, setSelectedSpotId] = useState<number | null>(null);
   const [isAddSpotOpen, setIsAddSpotOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [activeTypeFilter, setActiveTypeFilter] = useState<string | null>(null);
-  
+
   // Track last toast to prevent duplicate error notifications
   const lastToastRef = useRef<{ type: string; time: number } | null>(null);
 
@@ -79,20 +88,20 @@ export default function MapPage() {
   const userLocationSimple = useMemo<UserLocationSimple | null>(() => {
     if (!userLocation) return null;
     return { lat: userLocation.lat, lng: userLocation.lng };
-  }, [userLocation?.lat, userLocation?.lng]);
+  }, [userLocation]);
 
   // ---------------------------------------------------------------------------
   // Data Fetching
   // ---------------------------------------------------------------------------
-  const { 
-    data: spots = [], 
+  const {
+    data: spots = [],
     isLoading: isSpotsLoading,
     isError: isSpotsError,
     refetch: refetchSpots,
   } = useQuery<Spot[]>({
-    queryKey: ['/api/spots'],
-    staleTime: 30_000,        // Consider fresh for 30 seconds
-    gcTime: 5 * 60_000,       // Keep in garbage collection for 5 minutes
+    queryKey: ["/api/spots"],
+    staleTime: 30_000, // Consider fresh for 30 seconds
+    gcTime: 5 * 60_000, // Keep in garbage collection for 5 minutes
     refetchOnWindowFocus: false,
     retry: 2,
   });
@@ -100,34 +109,29 @@ export default function MapPage() {
   // ---------------------------------------------------------------------------
   // Memoized Computations
   // ---------------------------------------------------------------------------
-  
+
   // CRITICAL: Distance calculation wrapped in useMemo
   // Without this, we recalculate distances for ALL spots on EVERY render
   // With 1000 spots, that's 1000 haversine calculations per frame = battery death
   const spotsWithDistance = useMemo<SpotWithDistance[]>(() => {
     if (!userLocation) {
       // No location available - return spots with null distance
-      return spots.map(spot => ({
+      return spots.map((spot) => ({
         ...spot,
         distance: null,
         proximity: null,
       }));
     }
 
-    return spots.map(spot => {
-      const distance = calculateDistance(
-        userLocation.lat,
-        userLocation.lng,
-        spot.lat,
-        spot.lng
-      );
+    return spots.map((spot) => {
+      const distance = calculateDistance(userLocation.lat, userLocation.lng, spot.lat, spot.lng);
       return {
         ...spot,
         distance,
         proximity: getProximity(distance),
       };
     });
-  }, [spots, userLocation?.lat, userLocation?.lng]);
+  }, [spots, userLocation]);
 
   // Filter spots based on search and type
   const filteredSpots = useMemo(() => {
@@ -135,14 +139,13 @@ export default function MapPage() {
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter(s => 
-        s.name.toLowerCase().includes(q) || 
-        s.description?.toLowerCase().includes(q)
+      result = result.filter(
+        (s) => s.name.toLowerCase().includes(q) || s.description?.toLowerCase().includes(q)
       );
     }
 
     if (activeTypeFilter) {
-      result = result.filter(s => s.spotType === activeTypeFilter);
+      result = result.filter((s) => s.spotType === activeTypeFilter);
     }
 
     return result;
@@ -150,19 +153,19 @@ export default function MapPage() {
 
   // Pre-compute check-in count to avoid .filter() in render
   const checkInRangeCount = useMemo(() => {
-    return filteredSpots.filter(s => s.proximity === 'here').length;
+    return filteredSpots.filter((s) => s.proximity === "here").length;
   }, [filteredSpots]);
 
   // Selected spot from existing data - avoids redundant API fetch in modal
   const selectedSpot = useMemo<SpotWithDistance | null>(() => {
     if (selectedSpotId === null) return null;
-    return spotsWithDistance.find(s => s.id === selectedSpotId) ?? null;
+    return spotsWithDistance.find((s) => s.id === selectedSpotId) ?? null;
   }, [selectedSpotId, spotsWithDistance]);
 
   // ---------------------------------------------------------------------------
   // Stable Callbacks - prevents child component re-renders
   // ---------------------------------------------------------------------------
-  
+
   const handleSelectSpot = useCallback((spotId: number) => {
     setSelectedSpotId(spotId);
   }, []);
@@ -182,36 +185,36 @@ export default function MapPage() {
   // ---------------------------------------------------------------------------
   // Effects
   // ---------------------------------------------------------------------------
-  
+
   // Debounced toast for geolocation errors - prevents spamming the user
   useEffect(() => {
     const now = Date.now();
     const lastToast = lastToastRef.current;
-    
+
     // Skip if we recently showed a toast for this status type
     if (lastToast?.type === geolocation.status && now - lastToast.time < TOAST_DEBOUNCE_MS) {
       return;
     }
 
-    if (geolocation.status === 'denied') {
-      lastToastRef.current = { type: 'denied', time: now };
+    if (geolocation.status === "denied") {
+      lastToastRef.current = { type: "denied", time: now };
       toast({
-        title: 'Location Access Denied',
-        description: 'You can still browse spots, but check-ins require location access.',
-        variant: 'destructive',
+        title: "Location Access Denied",
+        description: "You can still browse spots, but check-ins require location access.",
+        variant: "destructive",
         duration: 8000,
       });
-    } else if (geolocation.status === 'timeout') {
-      lastToastRef.current = { type: 'timeout', time: now };
+    } else if (geolocation.status === "timeout") {
+      lastToastRef.current = { type: "timeout", time: now };
       toast({
-        title: 'Location Timed Out',
-        description: 'Getting your location took too long. Try again or browse without location.',
+        title: "Location Timed Out",
+        description: "Getting your location took too long. Try again or browse without location.",
         duration: 6000,
       });
-    } else if (geolocation.status === 'error' && geolocation.error) {
-      lastToastRef.current = { type: 'error', time: now };
+    } else if (geolocation.status === "error" && geolocation.error) {
+      lastToastRef.current = { type: "error", time: now };
       toast({
-        title: 'Location Unavailable',
+        title: "Location Unavailable",
         description: geolocation.error,
         duration: 5000,
       });
@@ -221,7 +224,7 @@ export default function MapPage() {
   // ---------------------------------------------------------------------------
   // Render Helpers
   // ---------------------------------------------------------------------------
-  
+
   const renderStatusMessage = useCallback(() => {
     if (isSpotsLoading) {
       return (
@@ -237,9 +240,9 @@ export default function MapPage() {
         <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
           <AlertCircle className="w-3 h-3" />
           Failed to load spots
-          <Button 
-            variant="link" 
-            size="sm" 
+          <Button
+            variant="link"
+            size="sm"
             onClick={() => refetchSpots()}
             className="text-red-400 underline p-0 h-auto ml-1"
           >
@@ -250,7 +253,7 @@ export default function MapPage() {
     }
 
     switch (geolocation.status) {
-      case 'ready':
+      case "ready":
         if (filteredSpots.length === 0 && !searchQuery && !activeTypeFilter) {
           return (
             <p className="text-sm text-gray-400 flex items-center gap-1 mt-1">
@@ -262,11 +265,11 @@ export default function MapPage() {
         return (
           <p className="text-sm text-gray-400 flex items-center gap-1 mt-1">
             <NavigationIcon className="w-3 h-3" />
-            {checkInRangeCount} spot{checkInRangeCount !== 1 ? 's' : ''} in check-in range
+            {checkInRangeCount} spot{checkInRangeCount !== 1 ? "s" : ""} in check-in range
           </p>
         );
 
-      case 'locating':
+      case "locating":
         return (
           <p className="text-sm text-gray-400 flex items-center gap-2 mt-1">
             <Loader2 className="w-3 h-3 animate-spin" />
@@ -274,7 +277,7 @@ export default function MapPage() {
           </p>
         );
 
-      case 'browse':
+      case "browse":
         return (
           <p className="text-sm text-blue-400 flex items-center gap-1 mt-1">
             <Eye className="w-3 h-3" />
@@ -282,7 +285,7 @@ export default function MapPage() {
           </p>
         );
 
-      case 'denied':
+      case "denied":
         return (
           <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
             <AlertCircle className="w-3 h-3" />
@@ -290,7 +293,7 @@ export default function MapPage() {
           </p>
         );
 
-      case 'timeout':
+      case "timeout":
         return (
           <p className="text-sm text-orange-400 flex items-center gap-1 mt-1">
             <Clock className="w-3 h-3" />
@@ -298,7 +301,7 @@ export default function MapPage() {
           </p>
         );
 
-      case 'error':
+      case "error":
         return (
           <p className="text-sm text-red-400 flex items-center gap-1 mt-1">
             <AlertCircle className="w-3 h-3" />
@@ -309,20 +312,30 @@ export default function MapPage() {
       default:
         return null;
     }
-  }, [isSpotsLoading, isSpotsError, geolocation.status, filteredSpots.length, checkInRangeCount, refetchSpots, searchQuery, activeTypeFilter]);
+  }, [
+    isSpotsLoading,
+    isSpotsError,
+    geolocation.status,
+    filteredSpots.length,
+    checkInRangeCount,
+    refetchSpots,
+    searchQuery,
+    activeTypeFilter,
+  ]);
 
-  const showRetryButtons = geolocation.status === 'denied' || 
-                           geolocation.status === 'timeout' || 
-                           geolocation.status === 'error';
+  const showRetryButtons =
+    geolocation.status === "denied" ||
+    geolocation.status === "timeout" ||
+    geolocation.status === "error";
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
-  
+
   return (
     <div className="h-dvh flex flex-col bg-[#181818] overflow-hidden">
       <Navigation />
-      
+
       {/* Full-screen map */}
       <main className="flex-1 relative min-h-0" role="main" aria-label="Skate spots map">
         {isSpotsLoading ? (
@@ -372,14 +385,12 @@ export default function MapPage() {
                     <MapPin className="w-6 h-6 text-[#ff6a00]" aria-hidden="true" />
                     Skate Spots
                     {!isSpotsLoading && spots.length > 0 && (
-                      <span className="text-sm font-normal text-gray-500">
-                        ({spots.length})
-                      </span>
+                      <span className="text-sm font-normal text-gray-500">({spots.length})</span>
                     )}
                   </h1>
                   {renderStatusMessage()}
                 </div>
-                
+
                 {showRetryButtons && (
                   <div className="flex gap-2" role="group" aria-label="Location options">
                     <Button
@@ -421,7 +432,7 @@ export default function MapPage() {
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
                   <Badge
                     variant={activeTypeFilter === null ? "default" : "outline"}
-                    className={`cursor-pointer whitespace-nowrap ${activeTypeFilter === null ? 'bg-[#ff6a00] text-white hover:bg-[#ff6a00]/90' : 'text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'}`}
+                    className={`cursor-pointer whitespace-nowrap ${activeTypeFilter === null ? "bg-[#ff6a00] text-white hover:bg-[#ff6a00]/90" : "text-gray-400 border-gray-700 hover:text-white hover:border-gray-500"}`}
                     onClick={() => setActiveTypeFilter(null)}
                   >
                     All
@@ -430,11 +441,11 @@ export default function MapPage() {
                     <Badge
                       key={type}
                       variant={activeTypeFilter === type ? "default" : "outline"}
-                      className={`cursor-pointer whitespace-nowrap capitalize ${activeTypeFilter === type ? 'bg-[#ff6a00] text-white hover:bg-[#ff6a00]/90' : 'text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'}`}
+                      className={`cursor-pointer whitespace-nowrap capitalize ${activeTypeFilter === type ? "bg-[#ff6a00] text-white hover:bg-[#ff6a00]/90" : "text-gray-400 border-gray-700 hover:text-white hover:border-gray-500"}`}
                       onClick={() => setActiveTypeFilter(type === activeTypeFilter ? null : type)}
                       data-testid={`filter-${type}`}
                     >
-                      {type.replace('-', ' ')}
+                      {type.replace("-", " ")}
                     </Badge>
                   ))}
                 </div>

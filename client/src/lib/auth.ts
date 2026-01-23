@@ -12,9 +12,10 @@ import {
   getRedirectResult as firebaseGetRedirectResult,
   signInAnonymously as firebaseSignInAnonymously,
   updateProfile,
-  type ConfirmationResult
+  type ConfirmationResult,
 } from "firebase/auth";
 import { auth } from "./firebase";
+import { apiRequest } from "./api/client";
 
 /**
  * Check if we're running in mock Firebase mode
@@ -48,7 +49,10 @@ async function signInAnonymously(authInstance: typeof auth): Promise<{ user: any
 /**
  * Wrapper for signInWithPopup that handles mock mode
  */
-async function signInWithPopup(authInstance: typeof auth, provider: GoogleAuthProvider): Promise<{ user: any }> {
+async function signInWithPopup(
+  authInstance: typeof auth,
+  provider: GoogleAuthProvider
+): Promise<{ user: any }> {
   if (isMockMode()) {
     return await (authInstance as any).signInWithPopup(provider);
   }
@@ -58,7 +62,10 @@ async function signInWithPopup(authInstance: typeof auth, provider: GoogleAuthPr
 /**
  * Wrapper for signInWithRedirect that handles mock mode
  */
-async function signInWithRedirect(authInstance: typeof auth, provider: GoogleAuthProvider): Promise<void> {
+async function signInWithRedirect(
+  authInstance: typeof auth,
+  provider: GoogleAuthProvider
+): Promise<void> {
   if (isMockMode()) {
     await (authInstance as any).signInWithRedirect(provider);
   } else {
@@ -120,33 +127,28 @@ async function authenticateWithBackend(firebaseUser: User, profile: BackendProfi
     payload.isRegistration = profile.isRegistration;
   }
 
-  const response = await fetch("/api/auth/login", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload),
-    credentials: "include"
-  });
-
-  if (!response.ok) {
-    let errorMessage = "Login failed";
-    try {
-      const errorData = await response.json();
-      if (typeof errorData?.error === "string" && errorData.error.trim().length > 0) {
-        errorMessage = errorData.error;
-      }
-    } catch (parseError) {
-      // ignore JSON parse errors - we'll use default message
+  try {
+    return await apiRequest({
+      method: "POST",
+      path: "/api/auth/login",
+      body: payload,
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      throw new Error(error.message);
     }
-    throw new Error(errorMessage);
+    throw new Error("Login failed");
   }
-
-  return response.json();
 }
 
-export async function registerUser(email: string, password: string, profile: RegistrationProfile = {}) {
+export async function registerUser(
+  email: string,
+  password: string,
+  profile: RegistrationProfile = {}
+) {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const firebaseUser = userCredential.user;
 
@@ -181,30 +183,34 @@ export async function loginUser(email: string, password: string) {
  */
 export async function loginWithGoogle(forceRedirect = false) {
   const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ 
+  provider.setCustomParameters({
     prompt: "select_account",
     // Request user's basic profile and email
-    scope: "profile email"
+    scope: "profile email",
   });
 
   // Mobile detection - prefer redirect on mobile devices
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
-  console.log('[Google Auth] Starting login, isMobile:', isMobile, 'forceRedirect:', forceRedirect);
-  console.log('[Google Auth] User agent:', navigator.userAgent);
-  
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+
+  console.log("[Google Auth] Starting login, isMobile:", isMobile, "forceRedirect:", forceRedirect);
+  console.log("[Google Auth] User agent:", navigator.userAgent);
+
   if (forceRedirect || isMobile) {
     // Use redirect flow (better for mobile)
-    console.log('[Google Auth] Using redirect flow for mobile/forced redirect');
+    console.log("[Google Auth] Using redirect flow for mobile/forced redirect");
     try {
       // Set flag so we know to show welcome toast when returning from redirect
-      sessionStorage.setItem('googleRedirectPending', 'true');
+      sessionStorage.setItem("googleRedirectPending", "true");
       await signInWithRedirect(auth, provider);
     } catch (redirectError: any) {
       // Clear flag on error
-      sessionStorage.removeItem('googleRedirectPending');
-      console.error('[Google Auth] Redirect initiation failed:', redirectError);
-      throw new Error(`Failed to start Google Sign-In: ${redirectError?.message || 'Unknown error'}`);
+      sessionStorage.removeItem("googleRedirectPending");
+      console.error("[Google Auth] Redirect initiation failed:", redirectError);
+      throw new Error(
+        `Failed to start Google Sign-In: ${redirectError?.message || "Unknown error"}`
+      );
     }
     // Note: User will be redirected away, control returns via handleGoogleRedirectResult() in AuthContext
     return null;
@@ -212,54 +218,54 @@ export async function loginWithGoogle(forceRedirect = false) {
 
   // Desktop: Try popup first
   let firebaseUser: User;
-  
+
   try {
     // Step 1: Firebase popup authentication
     const userCredential = await signInWithPopup(auth, provider);
     firebaseUser = userCredential.user;
   } catch (error: any) {
     // Handle Firebase popup errors (not backend errors)
-    const errorCode = error?.code || '';
-    const errorMessage = error?.message || '';
+    const errorCode = error?.code || "";
+    const errorMessage = error?.message || "";
 
     // Popup blocked or closed by user - fallback to redirect
-    if (errorCode === 'auth/popup-blocked' || 
-        errorCode === 'auth/popup-closed-by-user' ||
-        errorMessage.includes('popup')) {
-      console.log('[Google Auth] Popup blocked, falling back to redirect...');
+    if (
+      errorCode === "auth/popup-blocked" ||
+      errorCode === "auth/popup-closed-by-user" ||
+      errorMessage.includes("popup")
+    ) {
+      console.log("[Google Auth] Popup blocked, falling back to redirect...");
       await signInWithRedirect(auth, provider);
       return null;
     }
 
     // User cancelled
-    if (errorCode === 'auth/cancelled-popup-request' || 
-        errorCode === 'auth/user-cancelled') {
-      throw new Error('Google Sign-In was cancelled');
+    if (errorCode === "auth/cancelled-popup-request" || errorCode === "auth/user-cancelled") {
+      throw new Error("Google Sign-In was cancelled");
     }
 
     // Network errors
-    if (errorCode === 'auth/network-request-failed' ||
-        errorMessage.includes('network')) {
-      throw new Error('Network error. Please check your connection and try again.');
+    if (errorCode === "auth/network-request-failed" || errorMessage.includes("network")) {
+      throw new Error("Network error. Please check your connection and try again.");
     }
 
     // Account exists with different credential
-    if (errorCode === 'auth/account-exists-with-different-credential') {
-      throw new Error('An account already exists with this email using a different sign-in method');
+    if (errorCode === "auth/account-exists-with-different-credential") {
+      throw new Error("An account already exists with this email using a different sign-in method");
     }
 
     // Too many requests
-    if (errorCode === 'auth/too-many-requests') {
-      throw new Error('Too many sign-in attempts. Please try again in a few minutes.');
+    if (errorCode === "auth/too-many-requests") {
+      throw new Error("Too many sign-in attempts. Please try again in a few minutes.");
     }
 
     // Generic Firebase error - try redirect as last resort
-    console.warn('[Google Auth] Firebase popup failed, attempting redirect fallback:', errorCode);
+    console.warn("[Google Auth] Firebase popup failed, attempting redirect fallback:", errorCode);
     try {
       await signInWithRedirect(auth, provider);
       return null;
     } catch (redirectError: any) {
-      throw new Error(`Google Sign-In failed: ${redirectError?.message || 'Unknown error'}`);
+      throw new Error(`Google Sign-In failed: ${redirectError?.message || "Unknown error"}`);
     }
   }
 
@@ -271,9 +277,9 @@ export async function loginWithGoogle(forceRedirect = false) {
     // User successfully signed in with Google, but backend rejected them
     // Sign out from Firebase to avoid broken state
     await signOut(auth);
-    
+
     // Re-throw backend error so UI can show it directly
-    throw new Error(backendError?.message || 'Server authentication failed. Please try again.');
+    throw new Error(backendError?.message || "Server authentication failed. Please try again.");
   }
 }
 
@@ -282,44 +288,44 @@ export async function loginWithGoogle(forceRedirect = false) {
  * Call this on app initialization to complete redirect-based sign-in
  */
 export async function handleGoogleRedirect() {
-  console.log('[Google Auth] handleGoogleRedirect called');
-  
+  console.log("[Google Auth] handleGoogleRedirect called");
+
   try {
-    if (!auth || typeof auth.onAuthStateChanged !== 'function') {
-      console.log('[Google Auth] Auth not ready, skipping redirect check');
-      return null;
-    }
-    
-    // Skip redirect handling in mock mode - mock signInWithRedirect completes synchronously
-    // and doesn't require redirect result processing
-    if (isMockMode()) {
-      console.log('[Google Auth] Mock mode, skipping redirect check');
+    if (!auth || typeof auth.onAuthStateChanged !== "function") {
+      console.log("[Google Auth] Auth not ready, skipping redirect check");
       return null;
     }
 
-    console.log('[Google Auth] Checking for redirect result...');
+    // Skip redirect handling in mock mode - mock signInWithRedirect completes synchronously
+    // and doesn't require redirect result processing
+    if (isMockMode()) {
+      console.log("[Google Auth] Mock mode, skipping redirect check");
+      return null;
+    }
+
+    console.log("[Google Auth] Checking for redirect result...");
     const result = await getRedirectResult(auth);
-    
+
     if (result) {
       // User just returned from Google redirect
-      console.log('[Google Auth] Redirect result found, user:', result.user?.uid);
+      console.log("[Google Auth] Redirect result found, user:", result.user?.uid);
       const firebaseUser = result.user;
       return authenticateWithBackend(firebaseUser);
     }
-    
-    console.log('[Google Auth] No redirect result (normal page load)');
+
+    console.log("[Google Auth] No redirect result (normal page load)");
     return null; // No redirect result (normal page load)
   } catch (error: any) {
-    console.error('[Google Auth] handleGoogleRedirect error:', error);
-    const errorCode = error?.code || '';
-    
+    console.error("[Google Auth] handleGoogleRedirect error:", error);
+    const errorCode = error?.code || "";
+
     // Handle specific redirect errors
-    if (errorCode === 'auth/account-exists-with-different-credential') {
-      throw new Error('An account already exists with this email using a different sign-in method');
+    if (errorCode === "auth/account-exists-with-different-credential") {
+      throw new Error("An account already exists with this email using a different sign-in method");
     }
-    
-    if (errorCode === 'auth/credential-already-in-use') {
-      throw new Error('This credential is already associated with a different account');
+
+    if (errorCode === "auth/credential-already-in-use") {
+      throw new Error("This credential is already associated with a different account");
     }
 
     throw error;
@@ -335,9 +341,9 @@ export async function loginAnonymously() {
 
 export async function logoutUser() {
   try {
-    await fetch("/api/auth/logout", {
+    await apiRequest({
       method: "POST",
-      credentials: "include"
+      path: "/api/auth/logout",
     });
   } catch (error) {
     console.error("Backend logout failed:", error);
@@ -348,15 +354,15 @@ export async function logoutUser() {
 
 export const listenToAuth = (callback: (user: User | null) => void) => {
   try {
-    if (!auth || typeof auth.onAuthStateChanged !== 'function') {
+    if (!auth || typeof auth.onAuthStateChanged !== "function") {
       console.warn("[Auth] Firebase Auth not fully initialized, skipping listener");
-      if (typeof callback === 'function') callback(null);
+      if (typeof callback === "function") callback(null);
       return () => {};
     }
     return auth.onAuthStateChanged(callback);
   } catch (error) {
     console.error("[Auth] listenToAuth error:", error);
-    if (typeof callback === 'function') callback(null);
+    if (typeof callback === "function") callback(null);
     return () => {};
   }
 };
@@ -378,14 +384,17 @@ export async function setupRecaptcha(elementId: string): Promise<RecaptchaVerifi
     size: "invisible",
     callback: () => {
       // reCAPTCHA solved - Firebase will continue with phone auth
-    }
+    },
   });
 
   await activeRecaptcha.render();
   return activeRecaptcha;
 }
 
-export async function sendPhoneVerification(phoneNumber: string, recaptchaVerifier: RecaptchaVerifier) {
+export async function sendPhoneVerification(
+  phoneNumber: string,
+  recaptchaVerifier: RecaptchaVerifier
+) {
   const normalizedPhone = phoneNumber.replace(/[\s-]/g, "").trim();
 
   if (!normalizedPhone.startsWith("+")) {

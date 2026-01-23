@@ -7,14 +7,17 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Link } from "wouter";
+import { auth } from "../lib/firebase";
 
 export default function AuthVerifyPage() {
   const [, setLocation] = useLocation();
-  const [status, setStatus] = useState<"loading" | "success" | "error" | "reset-password">("loading");
+  const [status, setStatus] = useState<"loading" | "success" | "error" | "reset-password">(
+    "loading"
+  );
   const [message, setMessage] = useState("");
   const [mode, setMode] = useState<string | null>(null);
   const [oobCode, setOobCode] = useState<string | null>(null);
-  
+
   // Password reset state
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -25,9 +28,6 @@ export default function AuthVerifyPage() {
   useEffect(() => {
     const handleAction = async () => {
       try {
-        // Import auth dynamically to catch initialization errors
-        const { auth } = await import("../lib/firebase");
-        
         if (!auth) {
           setStatus("error");
           setMessage("Firebase authentication not configured. Please contact support.");
@@ -36,9 +36,9 @@ export default function AuthVerifyPage() {
 
         // Get the action code from URL query params
         const urlParams = new URLSearchParams(window.location.search);
-        const urlMode = urlParams.get('mode');
-        const urlOobCode = urlParams.get('oobCode');
-        
+        const urlMode = urlParams.get("mode");
+        const urlOobCode = urlParams.get("oobCode");
+
         setMode(urlMode);
         setOobCode(urlOobCode);
 
@@ -48,17 +48,17 @@ export default function AuthVerifyPage() {
           return;
         }
 
-        if (urlMode === 'verifyEmail') {
+        if (urlMode === "verifyEmail") {
           // Apply the verification code
           await applyActionCode(auth, urlOobCode);
           setStatus("success");
           setMessage("Your email has been verified successfully!");
-          
+
           // Auto-redirect to signin after 3 seconds
           setTimeout(() => {
             setLocation("/signin");
           }, 3000);
-        } else if (urlMode === 'resetPassword') {
+        } else if (urlMode === "resetPassword") {
           // Verify the password reset code is valid
           await verifyPasswordResetCode(auth, urlOobCode);
           setStatus("reset-password");
@@ -70,9 +70,9 @@ export default function AuthVerifyPage() {
       } catch (error: any) {
         console.error("Action error:", error);
         setStatus("error");
-        if (error.code === 'auth/expired-action-code') {
+        if (error.code === "auth/expired-action-code") {
           setMessage("This link has expired. Please request a new one.");
-        } else if (error.code === 'auth/invalid-action-code') {
+        } else if (error.code === "auth/invalid-action-code") {
           setMessage("This link is invalid or has already been used.");
         } else {
           setMessage(error.message || "Verification failed. The link may be invalid or expired.");
@@ -86,7 +86,7 @@ export default function AuthVerifyPage() {
   // Handle password reset submission
   const handlePasswordReset = async () => {
     setPasswordError("");
-    
+
     // Validate password
     if (newPassword.length < 8) {
       setPasswordError("Password must be at least 8 characters.");
@@ -111,24 +111,23 @@ export default function AuthVerifyPage() {
 
     setIsResetting(true);
     try {
-      const { auth } = await import("../lib/firebase");
       if (!auth || !oobCode) {
         throw new Error("Authentication not configured");
       }
-      
+
       await confirmPasswordReset(auth, oobCode, newPassword);
       setStatus("success");
       setMessage("Your password has been reset successfully!");
-      
+
       // Auto-redirect to signin after 3 seconds
       setTimeout(() => {
         setLocation("/auth");
       }, 3000);
     } catch (error: any) {
       console.error("Password reset error:", error);
-      if (error.code === 'auth/expired-action-code') {
+      if (error.code === "auth/expired-action-code") {
         setPasswordError("This reset link has expired. Please request a new one.");
-      } else if (error.code === 'auth/weak-password') {
+      } else if (error.code === "auth/weak-password") {
         setPasswordError("Password is too weak. Please choose a stronger password.");
       } else {
         setPasswordError(error.message || "Failed to reset password. Please try again.");
@@ -162,12 +161,12 @@ export default function AuthVerifyPage() {
               <div className="text-center py-8">
                 <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  {mode === 'resetPassword' ? 'Password Reset!' : 'Email Verified!'} ✅
+                  {mode === "resetPassword" ? "Password Reset!" : "Email Verified!"} ✅
                 </h2>
                 <p className="text-gray-300 mb-6">{message}</p>
                 <p className="text-gray-400 text-sm mb-4">Redirecting to sign in...</p>
                 <Link href="/auth">
-                  <Button 
+                  <Button
                     className="bg-orange-500 hover:bg-orange-600 text-white"
                     data-testid="button-goto-signin"
                   >
@@ -181,16 +180,18 @@ export default function AuthVerifyPage() {
               <div className="py-6">
                 <h2 className="text-2xl font-bold text-white mb-2 text-center">Reset Password</h2>
                 <p className="text-gray-400 text-center mb-6">{message}</p>
-                
+
                 <div className="space-y-4">
                   {/* New Password */}
                   <div className="space-y-2">
-                    <Label htmlFor="new-password" className="text-gray-300">New Password</Label>
+                    <Label htmlFor="new-password" className="text-gray-300">
+                      New Password
+                    </Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="new-password"
-                        type={showPassword ? 'text' : 'password'}
+                        type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
@@ -201,7 +202,11 @@ export default function AuthVerifyPage() {
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-3 top-3 text-gray-400 hover:text-gray-300"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                     <p className="text-xs text-gray-500">
@@ -211,12 +216,14 @@ export default function AuthVerifyPage() {
 
                   {/* Confirm Password */}
                   <div className="space-y-2">
-                    <Label htmlFor="confirm-password" className="text-gray-300">Confirm Password</Label>
+                    <Label htmlFor="confirm-password" className="text-gray-300">
+                      Confirm Password
+                    </Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="confirm-password"
-                        type={showPassword ? 'text' : 'password'}
+                        type={showPassword ? "text" : "password"}
                         placeholder="••••••••"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
@@ -226,9 +233,7 @@ export default function AuthVerifyPage() {
                   </div>
 
                   {/* Error Message */}
-                  {passwordError && (
-                    <p className="text-sm text-red-400">{passwordError}</p>
-                  )}
+                  {passwordError && <p className="text-sm text-red-400">{passwordError}</p>}
 
                   {/* Submit Button */}
                   <Button
@@ -242,7 +247,7 @@ export default function AuthVerifyPage() {
                         Resetting...
                       </>
                     ) : (
-                      'Reset Password'
+                      "Reset Password"
                     )}
                   </Button>
                 </div>
@@ -253,21 +258,19 @@ export default function AuthVerifyPage() {
               <div className="text-center py-8">
                 <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-white mb-2">
-                  {mode === 'resetPassword' ? 'Reset Failed' : 'Verification Failed'}
+                  {mode === "resetPassword" ? "Reset Failed" : "Verification Failed"}
                 </h2>
                 <p className="text-gray-300 mb-6">{message}</p>
                 <div className="space-y-2">
-                  {mode === 'resetPassword' ? (
+                  {mode === "resetPassword" ? (
                     <Link href="/auth">
-                      <Button 
-                        className="w-full bg-orange-500 hover:bg-orange-600 text-white"
-                      >
+                      <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">
                         Request New Reset Link
                       </Button>
                     </Link>
                   ) : (
                     <Link href="/signup">
-                      <Button 
+                      <Button
                         className="w-full bg-orange-500 hover:bg-orange-600 text-white"
                         data-testid="button-try-again"
                       >
@@ -276,8 +279,8 @@ export default function AuthVerifyPage() {
                     </Link>
                   )}
                   <Link href="/">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full border-gray-600 text-gray-300 hover:bg-gray-800"
                       data-testid="button-back-home"
                     >

@@ -34,6 +34,19 @@ service cloud.firestore {
         && request.resource.data[field] >= request.time - duration.value(5, 'm')
         && request.resource.data[field] <= request.time + duration.value(1, 'm');
     }
+
+    // Block client writes to protected trust/moderation fields
+    function hasProtectedProfileFields(data) {
+      return data.keys().hasAny([
+        'trustLevel',
+        'reputationScore',
+        'reputationSignals',
+        'isBanned',
+        'banExpiresAt',
+        'proVerificationStatus',
+        'isProVerified'
+      ]);
+    }
     
     // Check if user is participant in a game
     function isGameParticipant(gameData) {
@@ -54,9 +67,29 @@ service cloud.firestore {
     // enforcement requires custom token claims (tracked for future release).
     // =========================================================================
     
+    // User profiles in environment namespace (client-writable, but protected fields are server-only)
+    match /env/{environment}/users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId)
+        && !hasProtectedProfileFields(request.resource.data);
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'trustLevel',
+          'reputationScore',
+          'reputationSignals',
+          'isBanned',
+          'banExpiresAt',
+          'proVerificationStatus',
+          'isProVerified'
+        ]);
+      allow delete: if false;
+    }
+
     // Staging environment - full read/write for authenticated users
     match /env/staging/{path=**} {
-      allow read, write: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated()
+        && !path.matches('^users/.*');
     }
     
     // Production environment - read allowed, writes restricted for sensitive paths
@@ -67,17 +100,67 @@ service cloud.firestore {
       // Writes: block client writes to sensitive collections
       // These should go through Cloud Functions or server API
       allow write: if isAuthenticated()
-        && !(collection in ['billing', 'admin', 'moderation', 'analytics_events']);
+        && !(collection in ['billing', 'admin', 'moderation', 'analytics_events', 'users']);
+    }
+
+    // Moderation collections are server-only (Admin SDK)
+    match /moderation_users/{userId} {
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    match /reports/{reportId} {
+      allow read, write: if false;
+    }
+
+    match /mod_actions/{actionId} {
+      allow read, write: if false;
+    }
+
+    match /moderation_quotas/{quotaId} {
+      allow read, write: if false;
     }
     
     // =========================================================================
-    // USER PROFILES
+    // USER PROFILES - Firestore profiles with server-owned username uniqueness
     // =========================================================================
+
+    match /profiles/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId)
+        && !exists(/databases/$(db)/documents/profiles/$(userId));
+      allow update: if isOwner(userId)
+        && request.resource.data.username == resource.data.username;
+      allow delete: if false;
+    }
     
     match /users/{userId} {
-      // Only allow users to read and write their own profile
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId);
+      // DEPRECATED: User profiles are now stored in PostgreSQL (customUsers table)
+      // This path is kept for backward compatibility with presence/real-time features
+      // Only allow reading presence data, not full profiles
+      allow read: if isAuthenticated();
+      
+      // Block all writes - profiles must be updated via API (which writes to Postgres)
+      allow write: if false;
+    }
+    
+    // =========================================================================
+    // USER PRESENCE (Real-time online/offline status)
+    // =========================================================================
+    
+    match /presence/{userId} {
+      // Users can read anyone's presence status
+      allow read: if isAuthenticated();
+      
+      // Users can only update their own presence
+      allow write: if isOwner(userId)
+        && hasRequiredFields(['status', 'lastSeen'])
+        && request.resource.data.status in ['online', 'offline', 'away']
+        && request.resource.data.lastSeen is timestamp
+        && request.resource.data.lastSeen >= request.time - duration.value(1, 'm')
+        && request.resource.data.lastSeen <= request.time + duration.value(1, 'm')
+        // Only allow expected keys (prevent arbitrary data injection)
+        && request.resource.data.keys().hasOnly(['status', 'lastSeen', 'deviceId']);
     }
     
     // =========================================================================
@@ -182,7 +265,7 @@ service cloud.firestore {
       // Users can delete their own notifications
       allow delete: if isOwner(resource.data.userId);
     }
-    
+
     // =========================================================================
     // ACTIVE CHECK-INS (Live Spot Activity)
     // =========================================================================
@@ -300,6 +383,11 @@ service cloud.firestore {
 
     // Mail collection - server-only access
     match /mail/{doc} {
+      allow read, write: if false;
+    }
+
+    // Beta mail list - server-only access
+    match /mail_list/{docId} {
       allow read, write: if false;
     }
 

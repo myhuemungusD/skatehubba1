@@ -27,7 +27,7 @@
     <meta property="og:url" content="https://skatehubba.com" />
     <meta property="og:title" content="SkateHubba — Own Your Tricks" />
     <meta property="og:description" content="Remote SKATE battles, legendary spot check-ins, and live lobbies." />
-    <meta property="og:image" content="https://skatehubba.com/skatehubba-og.png" />
+    <meta property="og:image" content="https://skatehubba.com/images/og/skatehubba-og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="SkateHubba - Own Your Tricks. Play SKATE Anywhere." />
@@ -39,7 +39,7 @@
     <meta property="twitter:url" content="https://skatehubba.com" />
     <meta property="twitter:title" content="SkateHubba — Own Your Tricks" />
     <meta property="twitter:description" content="Remote SKATE battles, legendary spot check-ins, and live lobbies." />
-    <meta property="twitter:image" content="https://skatehubba.com/skatehubba-og.png" />
+    <meta property="twitter:image" content="https://skatehubba.com/images/og/skatehubba-og.png" />
     <meta property="twitter:image:alt" content="SkateHubba - Own Your Tricks. Play SKATE Anywhere." />
     <meta property="twitter:creator" content="@skatehubba_app" />
     <meta property="twitter:site" content="@skatehubba_app" />
@@ -48,6 +48,7 @@
     <meta name="theme-color" content="#ff6a00" />
     <meta name="application-name" content="SkateHubba" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="SkateHubba" />
     <meta name="format-detection" content="telephone=no" />
@@ -61,8 +62,6 @@
     <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://apis.google.com https://*.googleapis.com https://*.gstatic.com https://*.replit.dev https://*.repl.co;">
 
     <!-- Performance optimizations -->
-    <link rel="preload" href="/fonts/BebasNeue-Regular.woff2" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="/fonts/PermanentMarker-Regular.woff2" as="font" type="font/woff2" crossorigin>
     <style>html{scroll-behavior:smooth}img{content-visibility:auto}</style>
     <script defer src="https://js.stripe.com/v3/buy-button.js"></script>
 
@@ -88,10 +87,9 @@
       .transition-colors{transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;transition-timing-function:cubic-bezier(0.4,0,0.2,1);transition-duration:150ms}
     </style>
 
-    <!-- Fonts loaded locally via CSS @font-face with CDN fallback -->
+    <!-- Fonts loaded via CSS @font-face with CDN fallback -->
 
     <!-- Resource hints for performance -->
-    <link rel="preload" href="/attached_assets/hubbagraffwall.png" as="image" fetchpriority="high">
   </head>
   <body>
     <div id="root">

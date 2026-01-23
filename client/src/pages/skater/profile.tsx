@@ -1,39 +1,39 @@
-import { useEffect, useMemo } from 'react';
-import { useParams } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ChallengeButton } from '@/components/skater/ChallengeButton';
-import { ClosetGrid } from '@/components/skater/ClosetGrid';
-import { useAuth } from '@/context/AuthProvider';
-import { useToast } from '@/hooks/use-toast';
-import Navigation from '@/components/Navigation';
-import type { UserProfile, ClosetItem } from '@shared/schema';
+import { useEffect, useMemo } from "react";
+import { useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChallengeButton } from "@/components/skater/ChallengeButton";
+import { ClosetGrid } from "@/components/skater/ClosetGrid";
+import { useAuth } from "@/context/AuthProvider";
+import { useToast } from "@/hooks/use-toast";
+import Navigation from "@/components/Navigation";
+import type { UserProfile, ClosetItem } from "@shared/schema";
 
 export default function SkaterProfile() {
   const params = useParams();
-  const handle = params.handle || '';
+  const handle = params.handle || "";
   const authContext = useAuth();
   const user = authContext?.user ?? null;
   const { toast } = useToast();
 
   const { data: profile, isLoading: profileLoading } = useQuery<UserProfile>({
-    queryKey: ['/api/profiles', handle],
+    queryKey: ["/api/profiles", handle],
     enabled: !!handle,
   });
 
   const { data: closetItems = [], isLoading: closetLoading } = useQuery<ClosetItem[]>({
-    queryKey: ['/api/profiles', handle, 'closet'],
+    queryKey: ["/api/profiles", handle, "closet"],
     enabled: !!handle,
   });
 
   useEffect(() => {
     if (!profileLoading && !profile) {
       toast({
-        title: 'Skater not found',
+        title: "Skater not found",
         description: `@${handle} isn't in the system yet.`,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   }, [profileLoading, profile, handle, toast]);
@@ -77,7 +77,7 @@ export default function SkaterProfile() {
     <div className="relative min-h-screen">
       {/* Background (bedroom graffiti) */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[url('/profile-background.png')] bg-cover bg-center brightness-[0.55]" />
+        <div className="absolute inset-0 bg-[url('/images/backgrounds/profile-background.png')] bg-cover bg-center brightness-[0.55]" />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/80" />
       </div>
 
@@ -98,7 +98,7 @@ export default function SkaterProfile() {
                 />
               ) : (
                 <div className="grid h-full w-full place-items-center bg-neutral-900 text-neutral-400 text-xl">
-                  {profile.displayName?.charAt(0)?.toUpperCase() ?? 'S'}
+                  {profile.displayName?.charAt(0)?.toUpperCase() ?? "S"}
                 </div>
               )}
             </div>
@@ -124,7 +124,7 @@ export default function SkaterProfile() {
             <ChallengeButton challengedId={profile.id} challengedHandle={handle} />
           ) : (
             <Button variant="secondary" disabled className="opacity-60">
-              {user ? 'Your Profile' : 'Sign in to Challenge'}
+              {user ? "Your Profile" : "Sign in to Challenge"}
             </Button>
           )}
         </div>

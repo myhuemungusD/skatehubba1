@@ -1,0 +1,34 @@
+# Gitleaks Configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "SkateHubba Gitleaks Config"
+
+[extend]
+useDefault = true
+
+# Allowlist paths - these are excluded from ALL rules
+[allowlist]
+description = "Global allowlist for test fixtures, examples, and development placeholders"
+paths = [
+  '''__tests__/.*''',
+  '''.*\.test\.ts$''',
+  '''.*\.spec\.ts$''',
+  '''test-results/.*''',
+  '''\.env\.example$''',
+  '''docs/.*''',
+  '''_archive/.*''',
+  '''mobile/.*''',
+]
+regexes = [
+  # Test credential placeholders (clearly marked as test values)
+  '''test-session-secret.*''',
+  '''test-jwt-secret.*''',
+  '''postgres://test:test@localhost.*''',
+  '''dev-jwt-secret-change-in-production.*''',
+  '''sk_test_mock''',
+  # Firebase public API keys (these are NOT secrets - they're meant to be public)
+  '''AIzaSy[0-9A-Za-z_-]{33}''',
+]
+commits = [
+  "56bd080",  # .env file exposed (branch deleted, secrets rotated)
+]

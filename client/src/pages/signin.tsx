@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/AuthProvider";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
@@ -16,54 +16,82 @@ export default function SigninPage() {
   const auth = useAuth();
   const [, setLocation] = useLocation();
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (auth?.isAuthenticated) {
-      setLocation("/home");
+  // Parse ?next= param for redirect after login
+  const getNextUrl = useCallback((): string => {
+    if (typeof window === "undefined") return "/home";
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next) {
+      try {
+        const decoded = decodeURIComponent(next);
+        // Security: only allow relative paths
+        if (decoded.startsWith("/") && !decoded.startsWith("//")) {
+          return decoded;
+        }
+      } catch {
+        // Invalid encoding
+      }
     }
-  }, [auth?.isAuthenticated, setLocation]);
+    return "/home";
+  }, []);
+
+  // Redirect if already authenticated and profile status is known
+  useEffect(() => {
+    // Wait for profile status to be determined (not "unknown")
+    if (!auth?.isAuthenticated || auth?.profileStatus === "unknown") return;
+
+    if (auth.profileStatus === "exists") {
+      setLocation(getNextUrl());
+    } else if (auth.profileStatus === "missing") {
+      // Preserve next param when redirecting to profile setup
+      const nextUrl = getNextUrl();
+      const setupUrl =
+        nextUrl !== "/home"
+          ? `/profile/setup?next=${encodeURIComponent(nextUrl)}`
+          : "/profile/setup";
+      setLocation(setupUrl);
+    }
+  }, [auth?.isAuthenticated, auth?.profileStatus, setLocation, getNextUrl]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       await auth?.signInWithEmail(email, password);
-      toast({ 
+      // useEffect handles redirect based on profileStatus
+      toast({
         title: "Welcome back! 🛹",
-        description: "You've successfully signed in."
+        description: "Signing you in...",
       });
-      setLocation("/home");
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Login failed";
-      toast({ 
-        title: "Login failed", 
+      toast({
+        title: "Login failed",
         description: errorMessage,
-        variant: "destructive"
+        variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   }
 
   async function handleGoogleSignIn() {
     setIsLoading(true);
-    
+
     try {
       await auth?.signInWithGoogle();
-      toast({ 
+      // useEffect handles redirect based on profileStatus
+      toast({
         title: "Welcome! 🛹",
-        description: "You've successfully signed in with Google."
+        description: "Signing you in with Google...",
       });
-      setLocation("/home");
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Google sign-in failed";
-      toast({ 
-        title: "Google sign-in failed", 
+      toast({
+        title: "Google sign-in failed",
         description: errorMessage,
-        variant: "destructive"
+        variant: "destructive",
       });
-    } finally {
       setIsLoading(false);
     }
   }
@@ -148,7 +176,11 @@ export default function SigninPage() {
             <div className="mt-6 text-center">
               <p className="text-gray-400">
                 Don't have an account?{" "}
-                <Link href="/signup" className="text-orange-400 hover:text-orange-300 font-semibold" data-testid="link-to-signup">
+                <Link
+                  href="/signup"
+                  className="text-orange-400 hover:text-orange-300 font-semibold"
+                  data-testid="link-to-signup"
+                >
                   Sign Up
                 </Link>
               </p>
@@ -156,7 +188,10 @@ export default function SigninPage() {
 
             <div className="mt-4 text-center">
               <Link href="/">
-                <span className="text-gray-400 hover:text-white cursor-pointer inline-block" data-testid="link-back-home">
+                <span
+                  className="text-gray-400 hover:text-white cursor-pointer inline-block"
+                  data-testid="link-back-home"
+                >
                   ← Back to Home
                 </span>
               </Link>
