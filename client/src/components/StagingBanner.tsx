@@ -25,10 +25,9 @@ export function StagingBanner({ forceShow = false }: StagingBannerProps) {
 
   const hostname = typeof window !== "undefined" ? window.location.hostname : "";
   const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
-  const isProdHost = hostname === "skatehubba.com" || hostname === "www.skatehubba.com";
 
   // Only show in staging or local dev (localhost) or if forced
-  const showBanner = forceShow || isStaging() || (env === "local" && isLocalHost && !isProdHost);
+  const showBanner = forceShow || isStaging() || (env === "local" && isLocalHost);
   if (!showBanner) {
     return null;
   }
