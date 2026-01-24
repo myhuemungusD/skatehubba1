@@ -21,6 +21,7 @@ function getCurrentPath(): string {
 interface ProtectedRouteProps {
   path: string;
   component: ComponentType<{ params: Params }>;
+  allowMissingProfile?: boolean;
 }
 
 function FullScreenSpinner() {
@@ -45,7 +46,11 @@ function FullScreenSpinner() {
  * Profile existence is determined by AuthProvider.profileStatus which checks
  * if the Firestore profile document exists for the user.
  */
-export default function ProtectedRoute({ path, component: Component }: ProtectedRouteProps) {
+export default function ProtectedRoute({
+  path,
+  component: Component,
+  allowMissingProfile = false,
+}: ProtectedRouteProps) {
   const auth = useAuth();
   const [, setLocation] = useLocation();
 
@@ -68,7 +73,7 @@ export default function ProtectedRoute({ path, component: Component }: Protected
           return <FullScreenSpinner />;
         }
 
-        if (!bypass && auth.profileStatus === "missing") {
+        if (!bypass && auth.profileStatus === "missing" && !allowMissingProfile) {
           setLocation(`/profile/setup?next=${nextPath}`, { replace: true });
           return null;
         }
