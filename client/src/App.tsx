@@ -104,7 +104,7 @@ function RootRedirect() {
 
 function AppShellHomeRoute() {
   return (
-    <AppShell>
+    <AppShell hideNav>
       <Home />
     </AppShell>
   );
@@ -321,10 +321,14 @@ function AppRoutes() {
 
         <ProtectedRoute path="/dashboard" component={AppShellFeedRoute} />
         <ProtectedRoute path="/feed" component={AppShellFeedRoute} />
-        <ProtectedRoute path="/map" component={AppShellMapRoute} />
+        <ProtectedRoute path="/map" component={AppShellMapRoute} allowMissingProfile />
         <ProtectedRoute path="/spots/:id" component={AppShellSpotDetailRoute} />
         <ProtectedRoute path="/skate-game" component={AppShellSkateGameRoute} />
-        <ProtectedRoute path="/leaderboard" component={AppShellLeaderboardRoute} />
+        <ProtectedRoute
+          path="/leaderboard"
+          component={AppShellLeaderboardRoute}
+          allowMissingProfile
+        />
         <ProtectedRoute path="/trickmint" component={AppShellTrickmintRoute} />
         <ProtectedRoute path="/tutorial" component={AppShellTutorialRoute} />
         <ProtectedRoute path="/checkins" component={AppShellCheckinsRoute} />
