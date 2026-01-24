@@ -27,23 +27,20 @@ import { landingContent } from "../content/landing";
 import { useAuth } from "../context/AuthProvider";
 
 export default function UnifiedLanding() {
-  const { user, loading } = useAuth();
+  const auth = useAuth();
   const [, setLocation] = useLocation();
 
-  // Redirect authenticated users to /home
+  // Redirect authenticated users without profiles to setup
   useEffect(() => {
-    if (!loading && user) {
-      setLocation("/home", { replace: true });
+    if (auth.loading) return;
+
+    if (auth.isAuthenticated && auth.profileStatus === "missing") {
+      setLocation("/profile/setup?next=/landing", { replace: true });
     }
-  }, [user, loading, setLocation]);
+  }, [auth.isAuthenticated, auth.profileStatus, auth.loading, setLocation]);
 
   // Show nothing while checking auth (prevents flash)
-  if (loading) {
-    return null;
-  }
-
-  // If authenticated, don't render (redirect will happen)
-  if (user) {
+  if (auth.loading || (auth.isAuthenticated && auth.profileStatus === "unknown")) {
     return null;
   }
 
