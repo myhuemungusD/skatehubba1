@@ -14,10 +14,12 @@ export const landingContent = {
     primaryCTA: {
       text: "Sign In / Sign Up",
       href: "/auth",
+      testId: "cta-landing-primary",
     },
     secondaryCTA: {
       text: "Learn More",
       href: "/specs",
+      testId: "cta-landing-secondary",
     },
   },
   trustIndicators: [
