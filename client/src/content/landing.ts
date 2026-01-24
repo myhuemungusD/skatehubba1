@@ -15,6 +15,8 @@ export const landingContent = {
       text: "Sign In / Sign Up",
       href: "/auth",
     },
+    // Explicitly indicate that there is currently no secondary CTA on the hero section.
+    secondaryCTA: null,
   },
   trustIndicators: [
     {
