@@ -299,7 +299,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         } else {
           // If roles fetch failed, set error and mark as degraded
           let rolesError = "Failed to fetch roles";
-          if (rolesRes.status === "fulfilled") {
+          if (rolesRes.status === "fulfilled" && rolesRes.value.status !== "ok") {
             rolesError = rolesRes.value.error;
           } else if (rolesRes.status === "rejected") {
             rolesError =
@@ -323,7 +323,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (user) {
           // User signed in or session valid
           set({ user, loading: false });
-          
+
           // Fetch profile and roles if not already set
           const currentState = get();
           if (!currentState.profile || currentState.profileStatus === "unknown") {
