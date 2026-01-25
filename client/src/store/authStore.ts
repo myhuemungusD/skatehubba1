@@ -21,6 +21,14 @@ import { ensureProfile } from "../lib/profile/ensureProfile";
 export type UserRole = "admin" | "moderator" | "verified_pro";
 export type ProfileStatus = "unknown" | "exists" | "missing";
 
+export type BootStatus = "ok" | "degraded";
+export type BootPhase = "starting" | "auth_ready" | "hydrating" | "finalized";
+
+type Result<T> =
+  | { status: "ok"; data: T }
+  | { status: "error"; error: string }
+  | { status: "timeout"; error: string };
+
 export interface UserProfile {
   uid: string;
   username: string;
@@ -50,10 +58,13 @@ interface AuthState {
   profileStatus: ProfileStatus;
   roles: UserRole[];
   loading: boolean;
+  bootStatus: BootStatus;
+  bootPhase: BootPhase;
+  bootDurationMs: number;
   isInitialized: boolean;
   error: Error | null;
 
-  initialize: () => () => void;
+  initialize: () => Promise<void>;
   handleRedirectResult: () => Promise<void>;
 
   signInWithGoogle: () => Promise<void>;
@@ -178,94 +189,137 @@ const extractRolesFromToken = async (firebaseUser: FirebaseUser): Promise<UserRo
   }
 };
 
-let authUnsubscribe: (() => void) | null = null;
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<Result<T>> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+
+  const timeoutPromise = new Promise<Result<T>>((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve({ status: "timeout", error: `${label} exceeded ${ms}ms` });
+    }, ms);
+  });
+
+  try {
+    const data = await Promise.race([
+      promise.then((res): Result<T> => ({ status: "ok", data: res })),
+      timeoutPromise,
+    ]);
+    return data;
+  } catch (e) {
+    return { status: "error", error: e instanceof Error ? e.message : String(e) };
+  } finally {
+    clearTimeout(timeoutId!);
+  }
+}
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   profile: null,
   profileStatus: "unknown",
   roles: [],
+  bootStatus: "ok",
+  bootPhase: "starting",
+  bootDurationMs: 0,
   loading: true,
   isInitialized: false,
   error: null,
 
-  initialize: () => {
-    if (authUnsubscribe) return authUnsubscribe;
+  initialize: async () => {
+    const startTime = Date.now();
+    const BOOT_TIMEOUT_MS = 10000;
+    let finalStatus: BootStatus = "ok";
 
     set({ loading: true });
 
-    authUnsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        // Guest Mode: auto sign in anonymously if no user
-        if (!firebaseUser && GUEST_MODE) {
-          try {
-            const cred = await firebaseSignInAnonymously(auth);
-            firebaseUser = cred.user;
-          } catch {
-            set({ user: null, loading: false, isInitialized: true });
-            return;
-          }
-        }
+    try {
+      // PHASE 1: Auth (10s Cap)
+      set({ bootPhase: "auth_ready" });
 
-        if (firebaseUser) {
-          set({
-            user: firebaseUser,
-            profile: null,
-            profileStatus: "unknown",
-          });
+      const authPromise = new Promise<FirebaseUser | null>((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+          unsubscribe();
+          resolve(user);
+        });
+      });
 
-          // Ensure minimal profile in guest mode
-          if (GUEST_MODE) {
-            await ensureProfile(firebaseUser.uid);
-          }
+      const authResult = await withTimeout(authPromise, BOOT_TIMEOUT_MS, "auth_check");
+      let currentUser = authResult.status === "ok" ? authResult.data : null;
 
-          const cachedProfile = readProfileCache(firebaseUser.uid);
-
-          const [userProfile, userRoles] = await Promise.all([
-            cachedProfile ? Promise.resolve(cachedProfile.profile) : fetchProfile(firebaseUser.uid),
-            extractRolesFromToken(firebaseUser),
-          ]);
-
-          if (cachedProfile) {
-            set({
-              profile: cachedProfile.profile,
-              profileStatus: cachedProfile.status,
-            });
-          } else if (userProfile) {
-            set({
-              profile: userProfile,
-              profileStatus: "exists",
-            });
-            writeProfileCache(firebaseUser.uid, { status: "exists", profile: userProfile });
-          } else {
-            set({
-              profile: null,
-              profileStatus: "missing",
-            });
-            writeProfileCache(firebaseUser.uid, { status: "missing", profile: null });
-          }
-
-          set({ roles: userRoles, error: null });
+      // Guest Mode Fallback
+      if (!currentUser && GUEST_MODE) {
+        const anonResult = await withTimeout(firebaseSignInAnonymously(auth), 5000, "anon_signin");
+        if (anonResult.status === "ok") {
+          currentUser = anonResult.data.user;
         } else {
-          set({
-            user: null,
-            profile: null,
-            profileStatus: "unknown",
-            roles: [],
-          });
+          finalStatus = "degraded";
         }
-      } catch (err) {
-        console.error("[AuthStore] Auth state change error:", err);
-        if (err instanceof Error) {
-          set({ error: err });
-        }
-        set({ user: firebaseUser });
-      } finally {
-        set({ loading: false, isInitialized: true });
       }
-    });
 
-    return authUnsubscribe;
+      // PHASE 2: Data (Parallel, 4s Cap)
+      if (currentUser) {
+        set({ bootPhase: "hydrating", user: currentUser, profile: null, profileStatus: "unknown" });
+
+        // In Guest Mode, we also want to ensure a profile exists, but we won't block strictly on it
+        const promises: Promise<any>[] = [
+          withTimeout(fetchProfile(currentUser.uid), 4000, "fetchProfile"),
+          withTimeout(extractRolesFromToken(currentUser), 4000, "fetchRoles"),
+        ];
+
+        if (GUEST_MODE) {
+          promises.push(withTimeout(ensureProfile(currentUser.uid), 4000, "ensureProfile"));
+        }
+
+        const results = await Promise.allSettled(promises);
+
+        const profileRes = results[0] as PromiseSettledResult<Result<UserProfile | null>>;
+        const rolesRes = results[1] as PromiseSettledResult<Result<UserRole[]>>;
+
+        // Handle Profile Result
+        if (profileRes.status === "fulfilled" && profileRes.value.status === "ok") {
+          const userProfile = profileRes.value.data;
+          if (userProfile) {
+            set({ profile: userProfile, profileStatus: "exists" });
+            writeProfileCache(currentUser.uid, { status: "exists", profile: userProfile });
+          } else {
+            set({ profile: null, profileStatus: "missing" });
+            writeProfileCache(currentUser.uid, { status: "missing", profile: null });
+          }
+        } else {
+          // Fallback to cache if fetch failed
+          const cached = readProfileCache(currentUser.uid);
+          if (cached) {
+            set({ profile: cached.profile, profileStatus: cached.status });
+          } else {
+            finalStatus = "degraded";
+          }
+        }
+
+        // Handle Roles Result
+        if (rolesRes.status === "fulfilled" && rolesRes.value.status === "ok") {
+          set({ roles: rolesRes.value.data, error: null });
+        }
+      } else {
+        set({
+          user: null,
+          profile: null,
+          profileStatus: "unknown",
+          roles: [],
+        });
+      }
+    } catch (fatal) {
+      console.error("[AuthStore] Critical boot failure:", fatal);
+      finalStatus = "degraded";
+      if (fatal instanceof Error) {
+        set({ error: fatal });
+      }
+    } finally {
+      set({
+        loading: false,
+        isInitialized: true,
+        bootStatus: finalStatus,
+        bootPhase: "finalized",
+        bootDurationMs: Date.now() - startTime,
+      });
+    }
   },
 
   handleRedirectResult: async () => {

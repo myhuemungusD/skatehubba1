@@ -3,6 +3,4 @@
 > node ../scripts/build-server.mjs
 
 🔧 Building server with esbuild...
-📂 Copying client assets to server public directory...
-✅ Client assets copied successfully
 ✅ Server built successfully to dist/server/index.js

@@ -10,11 +10,6 @@ export function useAuthListener() {
   }, [handleRedirectResult]);
 
   useEffect(() => {
-    const unsubscribe = initialize();
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
+    void initialize();
   }, [initialize]);
 }
