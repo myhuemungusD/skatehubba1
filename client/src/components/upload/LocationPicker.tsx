@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { MapPin, Navigation } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -47,18 +47,28 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
+  const initialLocationRef = useRef({ lat: selectedLocation.lat, lng: selectedLocation.lng });
 
-  const handleLocationClick = (lat: number, lng: number) => {
-    const newLocation: Location = {
-      lat,
-      lng,
-      address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-    };
-    setSelectedLocation(newLocation);
-    setManualLat(lat.toFixed(6));
-    setManualLng(lng.toFixed(6));
-    onLocationSelect(newLocation);
-  };
+  const handleLocationClick = useCallback(
+    (lat: number, lng: number) => {
+      const newLocation: Location = {
+        lat,
+        lng,
+        address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+      };
+      setSelectedLocation(newLocation);
+      setManualLat(lat.toFixed(6));
+      setManualLng(lng.toFixed(6));
+      onLocationSelect(newLocation);
+    },
+    [onLocationSelect]
+  );
+
+  // Use ref to always have latest handler without re-registering click event
+  const handleLocationClickRef = useRef(handleLocationClick);
+  useEffect(() => {
+    handleLocationClickRef.current = handleLocationClick;
+  }, [handleLocationClick]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -72,8 +82,9 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
 
         if (!isMounted || !mapContainerRef.current || mapRef.current) return;
 
+        const initialCenter = initialLocationRef.current;
         const map = L.map(mapContainerRef.current, {
-          center: [selectedLocation.lat, selectedLocation.lng],
+          center: [initialCenter.lat, initialCenter.lng],
           zoom: 13,
           scrollWheelZoom: true,
           zoomControl: true,
@@ -85,10 +96,10 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
           maxZoom: 19,
         }).addTo(map);
 
-        markerRef.current = L.marker([selectedLocation.lat, selectedLocation.lng]).addTo(map);
+        markerRef.current = L.marker([initialCenter.lat, initialCenter.lng]).addTo(map);
 
         map.on("click", (e: L.LeafletMouseEvent) => {
-          handleLocationClick(e.latlng.lat, e.latlng.lng);
+          handleLocationClickRef.current(e.latlng.lat, e.latlng.lng);
         });
 
         mapRef.current = map;
@@ -108,7 +119,7 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
       }
       markerRef.current = null;
     };
-  }, [handleLocationClick, selectedLocation.lat, selectedLocation.lng]);
+  }, []);
 
   const getCurrentLocation = () => {
     setIsGettingLocation(true);

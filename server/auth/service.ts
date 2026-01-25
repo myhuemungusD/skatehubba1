@@ -305,9 +305,11 @@ export class AuthService {
   /**
    * Generate a password reset token for a user
    * @param email - Email address of user requesting password reset
-   * @returns Promise resolving to reset token if user exists and is verified, null otherwise
+   * @returns Promise resolving to { token, userName } if user exists and is verified, null otherwise
    */
-  static async generatePasswordResetToken(email: string): Promise<string | null> {
+  static async generatePasswordResetToken(
+    email: string
+  ): Promise<{ token: string; userName: string } | null> {
     const user = await this.findUserByEmail(email);
     if (!user || !user.isEmailVerified) return null;
 
@@ -323,7 +325,7 @@ export class AuthService {
       })
       .where(eq(customUsers.id, user.id));
 
-    return resetToken;
+    return { token: resetToken, userName: user.firstName || user.email.split("@")[0] };
   }
 
   /**

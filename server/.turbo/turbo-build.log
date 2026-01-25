@@ -1,5 +1,5 @@
 
-> skatehubba-server@1.0.0 build C:\Users\LowAn\skatehubba1\server
+> skatehubba-server@1.0.0 build /home/user/skatehubba/server
 > node ../scripts/build-server.mjs
 
 🔧 Building server with esbuild...

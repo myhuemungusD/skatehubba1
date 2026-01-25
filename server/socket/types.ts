@@ -113,8 +113,70 @@ export interface GameTurnPayload {
 
 export interface GameEndedPayload {
   gameId: string;
-  winnerId: string;
+  winnerId: string | null;
   finalStandings: Array<{ odv: string; letters: string }>;
+}
+
+export interface GamePausedPayload {
+  gameId: string;
+  reason: "player_disconnected";
+  disconnectedPlayer: string;
+  reconnectionWindowMs: number;
+}
+
+export interface GameResumedPayload {
+  gameId: string;
+  reconnectedPlayer?: string;
+  reason?: "player_forfeited";
+}
+
+export interface GamePlayerDisconnectedPayload {
+  gameId: string;
+  odv: string;
+  reconnectionWindowMs: number;
+}
+
+export interface GamePlayerReconnectedPayload {
+  gameId: string;
+  odv: string;
+  stillPaused: boolean;
+}
+
+export interface GamePlayerForfeitedPayload {
+  gameId: string;
+  odv: string;
+  reason: "disconnection_timeout";
+}
+
+export interface GamePlayerLeftPayload {
+  gameId: string;
+  odv: string;
+  playerCount: number;
+}
+
+export interface GameCancelledPayload {
+  gameId: string;
+  reason: "creator_left" | "no_players";
+}
+
+export interface GameReconnectedPayload {
+  gameId: string;
+  status: "waiting" | "active" | "paused" | "completed";
+  currentTurn: number;
+  currentPlayer: string;
+  action: "set" | "attempt";
+  letters: Record<string, string>;
+  players: string[];
+}
+
+export interface GameStatePayload {
+  gameId: string;
+  status: "waiting" | "active" | "paused" | "completed";
+  currentTurn: number;
+  currentPlayer: string;
+  action: "set" | "attempt";
+  letters: Record<string, string>;
+  players: string[];
 }
 
 // ============================================================================
@@ -158,6 +220,7 @@ export interface ClientToServerEvents {
   // S.K.A.T.E. game actions
   "game:create": (spotId: string, maxPlayers?: number) => void;
   "game:join": (gameId: string) => void;
+  "game:reconnect": (gameId: string) => void;
   "game:trick": (data: Omit<GameTrickPayload, "sentAt">) => void;
   "game:pass": (gameId: string) => void;
 
@@ -187,10 +250,19 @@ export interface ServerToClientEvents {
   // S.K.A.T.E. game events
   "game:created": (data: GameCreatedPayload) => void;
   "game:joined": (data: GameJoinedPayload) => void;
+  "game:reconnected": (data: GameReconnectedPayload) => void;
+  "game:state": (data: GameStatePayload) => void;
   "game:trick": (data: GameTrickPayload) => void;
   "game:letter": (data: GameLetterPayload) => void;
   "game:turn": (data: GameTurnPayload) => void;
   "game:ended": (data: GameEndedPayload) => void;
+  "game:paused": (data: GamePausedPayload) => void;
+  "game:resumed": (data: GameResumedPayload) => void;
+  "game:playerDisconnected": (data: GamePlayerDisconnectedPayload) => void;
+  "game:playerReconnected": (data: GamePlayerReconnectedPayload) => void;
+  "game:playerForfeited": (data: GamePlayerForfeitedPayload) => void;
+  "game:playerLeft": (data: GamePlayerLeftPayload) => void;
+  "game:cancelled": (data: GameCancelledPayload) => void;
 
   // Notifications
   notification: (data: NotificationPayload) => void;

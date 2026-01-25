@@ -20,26 +20,88 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 
-// Security middleware
-if (process.env.NODE_ENV === "production") {
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          scriptSrc: ["'self'", "'unsafe-inline'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", "data:", "https:", "blob:"],
-          connectSrc: ["'self'", "https:"],
-          fontSrc: ["'self'", "data:"],
-          objectSrc: ["'none'"],
-          mediaSrc: ["'self'"],
-          frameSrc: ["'none'"],
-        },
-      },
-    })
+// Security middleware - enterprise-grade security headers
+app.use(
+  helmet({
+    // Content Security Policy - prevent XSS and injection attacks
+    contentSecurityPolicy:
+      process.env.NODE_ENV === "production"
+        ? {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+              styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+              imgSrc: ["'self'", "data:", "https:", "blob:"],
+              connectSrc: [
+                "'self'",
+                "https:",
+                "wss:",
+                "https://*.firebaseio.com",
+                "https://*.googleapis.com",
+                "https://api.stripe.com",
+              ],
+              fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+              objectSrc: ["'none'"],
+              mediaSrc: ["'self'", "blob:"],
+              frameSrc: ["https://js.stripe.com", "https://hooks.stripe.com"],
+              workerSrc: ["'self'", "blob:"],
+              childSrc: ["'self'", "blob:"],
+              formAction: ["'self'"],
+              frameAncestors: ["'none'"],
+              baseUri: ["'self'"],
+              upgradeInsecureRequests: [],
+            },
+          }
+        : false,
+    // Strict-Transport-Security - enforce HTTPS
+    strictTransportSecurity:
+      process.env.NODE_ENV === "production"
+        ? {
+            maxAge: 31536000, // 1 year
+            includeSubDomains: true,
+            preload: true,
+          }
+        : false,
+    // X-Content-Type-Options - prevent MIME type sniffing (no X- prefix in helmet)
+    noSniff: true,
+    // X-Frame-Options - prevent clickjacking
+    frameguard: { action: "deny" },
+    // X-XSS-Protection - legacy XSS protection
+    xssFilter: true,
+    // Referrer-Policy - control referrer information
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    // X-DNS-Prefetch-Control - control DNS prefetching
+    dnsPrefetchControl: { allow: false },
+    // X-Permitted-Cross-Domain-Policies - prevent Adobe cross-domain policies
+    permittedCrossDomainPolicies: { permittedPolicies: "none" },
+    // X-Download-Options - prevent IE from executing downloads
+    ieNoOpen: true,
+    // Origin-Agent-Cluster - request process isolation
+    originAgentCluster: true,
+    // Cross-Origin-Embedder-Policy - control cross-origin embedding
+    crossOriginEmbedderPolicy: false, // Disabled for third-party content (maps, videos)
+    // Cross-Origin-Opener-Policy - control window opener access
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    // Cross-Origin-Resource-Policy - control cross-origin resource sharing
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Allow cross-origin for API
+  })
+);
+
+// Additional security headers not covered by helmet
+app.use((_req, res, next) => {
+  // Permissions-Policy - control browser features
+  res.setHeader(
+    "Permissions-Policy",
+    "accelerometer=(), camera=(), geolocation=(self), gyroscope=(), magnetometer=(), microphone=(), payment=(self), usb=()"
   );
-}
+  // Cache-Control for API responses
+  if (_req.path.startsWith("/api")) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+  }
+  next();
+});
 
 // CORS configuration
 const corsOptions = {
@@ -92,17 +154,81 @@ await registerRoutes(app);
 const io = initializeSocketServer(server);
 logger.info("[Server] WebSocket server initialized");
 
-// Health check endpoint with socket stats
+// Liveness probe - indicates the server is running
+// Use for Kubernetes livenessProbe or load balancer health checks
 app.get("/api/health", (_req, res) => {
   const stats = getSocketStats();
   res.json({
     status: "ok",
     timestamp: new Date().toISOString(),
+    version: process.env.npm_package_version || "1.0.0",
+    uptime: process.uptime(),
     websocket: {
       connections: stats.connections,
       rooms: stats.rooms.totalRooms,
       onlineUsers: stats.presence.online,
     },
+  });
+});
+
+// Readiness probe - indicates the server can accept traffic
+// Use for Kubernetes readinessProbe to check if all dependencies are ready
+app.get("/api/ready", async (_req, res) => {
+  const checks: { name: string; status: "ok" | "error"; latencyMs?: number; error?: string }[] = [];
+  const startTime = Date.now();
+
+  // Check database connection
+  try {
+    const { isDatabaseAvailable, pool } = await import("./db.ts");
+    if (isDatabaseAvailable() && pool) {
+      const dbStart = Date.now();
+      const client = await pool.connect();
+      await client.query("SELECT 1");
+      client.release();
+      checks.push({
+        name: "database",
+        status: "ok",
+        latencyMs: Date.now() - dbStart,
+      });
+    } else {
+      checks.push({
+        name: "database",
+        status: "error",
+        error: "Database not configured",
+      });
+    }
+  } catch (error) {
+    checks.push({
+      name: "database",
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+
+  // Check WebSocket server
+  try {
+    const stats = getSocketStats();
+    checks.push({
+      name: "websocket",
+      status: "ok",
+      latencyMs: 0,
+    });
+  } catch (error) {
+    checks.push({
+      name: "websocket",
+      status: "error",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+
+  const allOk = checks.every((check) => check.status === "ok");
+  const totalLatency = Date.now() - startTime;
+
+  res.status(allOk ? 200 : 503).json({
+    status: allOk ? "ready" : "not_ready",
+    timestamp: new Date().toISOString(),
+    totalLatencyMs: totalLatency,
+    checks,
   });
 });
 
@@ -165,6 +291,45 @@ server.listen(port, "0.0.0.0", () => {
     logger.info(`SkateHubba production server running on port ${port}`);
     logger.info("WebSocket server ready for connections");
   }
+});
+
+// Global Express error handler (must be last middleware)
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error("[Server] Unhandled Express error", {
+    error: err.message,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+  });
+
+  // Don't leak error details in production
+  const statusCode = (err as any).statusCode || 500;
+  res.status(statusCode).json({
+    error: process.env.NODE_ENV === "production" ? "Internal server error" : err.message,
+    ...(process.env.NODE_ENV === "development" && { stack: err.stack }),
+  });
+});
+
+// Global error handlers for uncaught exceptions and unhandled rejections
+process.on("uncaughtException", (error: Error) => {
+  logger.error("[Server] Uncaught exception - server will restart", {
+    error: error.message,
+    stack: error.stack,
+  });
+
+  // Give time for logging, then exit
+  // In production, process manager (PM2, systemd, k8s) should restart the process
+  setTimeout(() => {
+    process.exit(1);
+  }, 1000);
+});
+
+process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
+  logger.error("[Server] Unhandled promise rejection", {
+    reason: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+
+  // Don't exit on unhandled rejections, but log for monitoring
+  // This allows the application to continue running for other requests
 });
 
 // Graceful shutdown

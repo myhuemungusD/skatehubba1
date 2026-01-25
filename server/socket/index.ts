@@ -17,7 +17,11 @@ import logger from "../logger";
 import { socketAuthMiddleware } from "./auth";
 import { joinRoom, leaveRoom, leaveAllRooms, getRoomStats } from "./rooms";
 import { registerBattleHandlers, cleanupBattleSubscriptions } from "./handlers/battle";
-import { registerGameHandlers, cleanupGameSubscriptions } from "./handlers/game";
+import {
+  registerGameHandlers,
+  cleanupGameSubscriptions,
+  handlePlayerReconnect,
+} from "./handlers/game";
 import {
   registerPresenceHandlers,
   handlePresenceDisconnect,
@@ -144,7 +148,7 @@ export function initializeSocketServer(
 
       // Cleanup subscriptions
       await cleanupBattleSubscriptions(socket);
-      await cleanupGameSubscriptions(socket);
+      await cleanupGameSubscriptions(io, socket);
       await leaveAllRooms(socket);
       handlePresenceDisconnect(io, socket);
       cleanupSocketHealth(socket.id);

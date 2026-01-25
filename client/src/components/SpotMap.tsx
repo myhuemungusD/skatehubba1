@@ -135,7 +135,10 @@ export const SpotMap = memo(function SpotMap({
     // Cleanup only on unmount
     return () => {
       isMounted = false;
+      // These refs hold Map objects (not DOM nodes), safe to access in cleanup
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       const spotMarkers = spotMarkersRef.current;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       const markerProximity = markerProximityRef.current;
       const userMarker = userMarkerRef.current;
       const accuracyCircle = accuracyCircleRef.current;

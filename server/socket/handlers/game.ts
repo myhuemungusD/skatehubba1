@@ -30,11 +30,15 @@ interface GameState {
   currentTurn: number;
   currentAction: "set" | "attempt";
   letters: Map<string, string>;
-  status: "waiting" | "active" | "completed";
+  status: "waiting" | "active" | "paused" | "completed";
   createdAt: Date;
+  disconnectedPlayers: Map<string, { disconnectedAt: Date; reconnectTimeout: NodeJS.Timeout }>;
 }
 
 const games = new Map<string, GameState>();
+
+// Reconnection window in milliseconds (2 minutes)
+const RECONNECTION_TIMEOUT_MS = 120_000;
 
 /**
  * Generate game ID
@@ -83,6 +87,7 @@ export function registerGameHandlers(io: TypedServer, socket: TypedSocket): void
         letters: new Map([[data.odv, ""]]),
         status: "waiting",
         createdAt: new Date(),
+        disconnectedPlayers: new Map(),
       };
 
       games.set(gameId, gameState);
@@ -188,6 +193,66 @@ export function registerGameHandlers(io: TypedServer, socket: TypedSocket): void
       socket.emit("error", {
         code: "game_join_failed",
         message: "Failed to join game",
+      });
+    }
+  });
+
+  /**
+   * Reconnect to an active game after disconnection
+   */
+  socket.on("game:reconnect", async (gameId: string) => {
+    try {
+      const game = games.get(gameId);
+
+      if (!game) {
+        socket.emit("error", {
+          code: "game_not_found",
+          message: "Game not found",
+        });
+        return;
+      }
+
+      if (!game.players.includes(data.odv)) {
+        socket.emit("error", {
+          code: "not_in_game",
+          message: "You are not a participant in this game",
+        });
+        return;
+      }
+
+      // Rejoin the room
+      await joinRoom(socket, "game", gameId);
+
+      // Handle reconnection
+      const reconnected = handlePlayerReconnect(io, socket, gameId);
+
+      if (reconnected) {
+        socket.emit("game:reconnected", {
+          gameId,
+          status: game.status,
+          currentTurn: game.currentTurn,
+          currentPlayer: game.players[game.currentTurn],
+          action: game.currentAction,
+          letters: Object.fromEntries(game.letters),
+          players: game.players,
+        });
+      } else {
+        // Player wasn't in disconnected state, just send current game state
+        socket.emit("game:state", {
+          gameId,
+          status: game.status,
+          currentTurn: game.currentTurn,
+          currentPlayer: game.players[game.currentTurn],
+          action: game.currentAction,
+          letters: Object.fromEntries(game.letters),
+          players: game.players,
+        });
+      }
+    } catch (error) {
+      logger.error("[Game] Reconnect failed", { error, gameId, odv: data.odv });
+      socket.emit("error", {
+        code: "game_reconnect_failed",
+        message: "Failed to reconnect to game",
       });
     }
   });
@@ -384,20 +449,206 @@ export function registerGameHandlers(io: TypedServer, socket: TypedSocket): void
 }
 
 /**
+ * Handle player reconnection to an active game
+ */
+export function handlePlayerReconnect(
+  io: TypedServer,
+  socket: TypedSocket,
+  gameId: string
+): boolean {
+  const data = socket.data as SocketData;
+  const game = games.get(gameId);
+
+  if (!game) return false;
+
+  const disconnectInfo = game.disconnectedPlayers.get(data.odv);
+  if (!disconnectInfo) return false;
+
+  // Clear the forfeit timeout
+  clearTimeout(disconnectInfo.reconnectTimeout);
+  game.disconnectedPlayers.delete(data.odv);
+
+  logger.info("[Game] Player reconnected", { gameId, odv: data.odv });
+
+  // Resume game if no other disconnected players
+  if (game.disconnectedPlayers.size === 0 && game.status === "paused") {
+    game.status = "active";
+
+    broadcastToRoom(io, "game", gameId, "game:resumed", {
+      gameId,
+      reconnectedPlayer: data.odv,
+    });
+
+    // Send current turn info
+    const turnPayload: GameTurnPayload = {
+      gameId,
+      currentPlayer: game.players[game.currentTurn],
+      action: game.currentAction,
+    };
+    broadcastToRoom(io, "game", gameId, "game:turn", turnPayload);
+  } else {
+    // Notify others of reconnection but game still paused
+    broadcastToRoom(io, "game", gameId, "game:playerReconnected", {
+      gameId,
+      odv: data.odv,
+      stillPaused: game.disconnectedPlayers.size > 0,
+    });
+  }
+
+  return true;
+}
+
+/**
+ * Forfeit a player from the game (called when reconnection timeout expires)
+ */
+function forfeitPlayer(io: TypedServer, gameId: string, odv: string): void {
+  const game = games.get(gameId);
+  if (!game) return;
+
+  // Remove from disconnected tracking
+  game.disconnectedPlayers.delete(odv);
+
+  // Set player as eliminated (give them full SKATE)
+  game.letters.set(odv, "SKATE");
+
+  // Broadcast forfeit
+  broadcastToRoom(io, "game", gameId, "game:playerForfeited", {
+    gameId,
+    odv,
+    reason: "disconnection_timeout",
+  });
+
+  logger.info("[Game] Player forfeited due to disconnection timeout", { gameId, odv });
+
+  // Check remaining active players
+  const activePlayers = game.players.filter((p) => !isEliminated(game.letters.get(p) || ""));
+
+  if (activePlayers.length === 1) {
+    // Game over - declare winner
+    game.status = "completed";
+
+    broadcastToRoom(io, "game", gameId, "game:ended", {
+      gameId,
+      winnerId: activePlayers[0],
+      finalStandings: game.players.map((p) => ({
+        odv: p,
+        letters: game.letters.get(p) || "",
+      })),
+    });
+  } else if (activePlayers.length === 0) {
+    // No active players left (shouldn't happen normally)
+    game.status = "completed";
+    broadcastToRoom(io, "game", gameId, "game:ended", {
+      gameId,
+      winnerId: null,
+      finalStandings: game.players.map((p) => ({
+        odv: p,
+        letters: game.letters.get(p) || "",
+      })),
+    });
+  } else {
+    // Resume if no more disconnected players
+    if (game.disconnectedPlayers.size === 0) {
+      game.status = "active";
+
+      // Adjust current turn if disconnected player was the current player
+      const currentPlayer = game.players[game.currentTurn];
+      if (isEliminated(game.letters.get(currentPlayer) || "")) {
+        // Move to next active player
+        do {
+          game.currentTurn = (game.currentTurn + 1) % game.players.length;
+        } while (isEliminated(game.letters.get(game.players[game.currentTurn]) || ""));
+      }
+
+      broadcastToRoom(io, "game", gameId, "game:resumed", {
+        gameId,
+        reason: "player_forfeited",
+      });
+
+      const turnPayload: GameTurnPayload = {
+        gameId,
+        currentPlayer: game.players[game.currentTurn],
+        action: game.currentAction,
+      };
+      broadcastToRoom(io, "game", gameId, "game:turn", turnPayload);
+    }
+  }
+}
+
+/**
  * Clean up game subscriptions on disconnect
  */
-export async function cleanupGameSubscriptions(socket: TypedSocket): Promise<void> {
+export async function cleanupGameSubscriptions(
+  io: TypedServer,
+  socket: TypedSocket
+): Promise<void> {
   const data = socket.data as SocketData;
 
   for (const roomId of data.rooms) {
     if (roomId.startsWith("game:")) {
       const gameId = roomId.replace("game:", "");
-      await leaveRoom(socket, "game", gameId);
+      const game = games.get(gameId);
 
-      // TODO: Handle player disconnect in active game
-      // - Pause game
-      // - Set timeout for reconnection
-      // - Forfeit if no reconnection
+      if (game && game.players.includes(data.odv)) {
+        // Handle disconnect based on game state
+        if (game.status === "active" || game.status === "paused") {
+          // Mark player as disconnected and start reconnection timeout
+          const reconnectTimeout = setTimeout(() => {
+            forfeitPlayer(io, gameId, data.odv);
+          }, RECONNECTION_TIMEOUT_MS);
+
+          game.disconnectedPlayers.set(data.odv, {
+            disconnectedAt: new Date(),
+            reconnectTimeout,
+          });
+
+          // Pause the game if it's active
+          if (game.status === "active") {
+            game.status = "paused";
+
+            broadcastToRoom(io, "game", gameId, "game:paused", {
+              gameId,
+              reason: "player_disconnected",
+              disconnectedPlayer: data.odv,
+              reconnectionWindowMs: RECONNECTION_TIMEOUT_MS,
+            });
+          } else {
+            // Game already paused, notify of additional disconnect
+            broadcastToRoom(io, "game", gameId, "game:playerDisconnected", {
+              gameId,
+              odv: data.odv,
+              reconnectionWindowMs: RECONNECTION_TIMEOUT_MS,
+            });
+          }
+
+          logger.info("[Game] Player disconnected from active game", {
+            gameId,
+            odv: data.odv,
+            reconnectionWindowMs: RECONNECTION_TIMEOUT_MS,
+          });
+        } else if (game.status === "waiting") {
+          // Remove player from waiting game
+          game.players = game.players.filter((p) => p !== data.odv);
+          game.letters.delete(data.odv);
+
+          broadcastToRoom(io, "game", gameId, "game:playerLeft", {
+            gameId,
+            odv: data.odv,
+            playerCount: game.players.length,
+          });
+
+          // Delete game if creator left or no players remain
+          if (game.players.length === 0 || game.creatorId === data.odv) {
+            games.delete(gameId);
+            broadcastToRoom(io, "game", gameId, "game:cancelled", {
+              gameId,
+              reason: game.creatorId === data.odv ? "creator_left" : "no_players",
+            });
+          }
+        }
+      }
+
+      await leaveRoom(socket, "game", gameId);
     }
   }
 }
