@@ -1,15 +1,16 @@
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
-import { useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { useState, useCallback } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Camera, CameraType } from "expo-camera";
 import { Video } from "expo-av";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { httpsCallable } from "firebase/functions";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { functions, storage, auth } from "@/lib/firebase.config";
+import { functions, auth } from "@/lib/firebase.config";
 import { showMessage } from "react-native-flash-message";
 import { Ionicons } from "@expo/vector-icons";
 import { SKATE } from "@/theme";
+import { useVideoUpload } from "@/hooks/useVideoUpload";
+import { VIDEO_LIMITS } from "@/services/upload";
 
 const createChallenge = httpsCallable(functions, "createChallenge");
 
@@ -22,8 +23,23 @@ export default function NewChallengeScreen() {
   const [recording, setRecording] = useState(false);
   const [videoUri, setVideoUri] = useState<string | null>(null);
   const [camera, setCamera] = useState<Camera | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+
+  // Use the enterprise video upload hook
+  const {
+    isUploading,
+    isValidating,
+    isPaused,
+    progress,
+    status,
+    error: uploadError,
+    upload,
+    pause,
+    resume,
+    cancel,
+    retry,
+    reset,
+    estimatedTimeRemaining,
+  } = useVideoUpload();
 
   // Validate opponent UID is provided
   if (!params.opponentUid) {
@@ -86,17 +102,13 @@ export default function NewChallengeScreen() {
     setVideoUri(video.uri);
   };
 
-  // FFmpeg optimization for <6s LTE upload (requires react-native-ffmpeg or expo-av)
-  // const ffmpegCommand = `-i ${videoUri} -c:v h264 -b:v 4M -maxrate 4M -bufsize 8M -preset ultrafast -r 30 -vf "scale=1280:720" -c:a aac -b:a 128k ${outputPath}`;
-  // TODO: Add video compression before upload to reduce file size by 60-70%
-
   const stopRecording = () => {
     if (camera && recording) {
       camera.stopRecording();
     }
   };
 
-  const submitChallenge = async () => {
+  const submitChallenge = useCallback(async () => {
     if (!videoUri || !auth.currentUser) {
       showMessage({
         message: "Not authenticated or no video to upload",
@@ -105,55 +117,61 @@ export default function NewChallengeScreen() {
       return;
     }
 
-    try {
-      setUploading(true);
-      setUploadProgress(0);
+    // Use the enterprise upload service
+    const result = await upload(videoUri, params.opponentUid as string);
 
-      // Create storage paths
-      const timestamp = Date.now();
-      const storagePath = `challenges/${auth.currentUser.uid}/${timestamp}.mp4`;
-
-      // Fetch video file from local URI
-      const response = await fetch(videoUri);
-      const blob = await response.blob();
-
-      // Upload video to Firebase Storage with progress
-      const storageRef = ref(storage, storagePath);
-      const uploadTask = uploadBytesResumable(storageRef, blob, {
-        contentType: "video/mp4",
-      });
-
-      const clipUrl = await new Promise<string>((resolve, reject) => {
-        uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            if (snapshot.totalBytes > 0) {
-              const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-              setUploadProgress(progress);
-            }
-          },
-          (error) => reject(error),
-          async () => {
-            const url = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(url);
-          }
-        );
-      });
-
+    if (result.success && result.downloadUrl) {
       // Auto-send challenge with uploaded video
       challengeMutation.mutate({
-        clipUrl,
-        thumbnailUrl: undefined, // Optional for now
+        clipUrl: result.downloadUrl,
+        thumbnailUrl: undefined,
       });
-    } catch (error: any) {
+    } else if (result.error) {
       showMessage({
-        message: error?.message || "Failed to upload video",
+        message: result.error.message,
         type: "danger",
       });
-    } finally {
-      setUploading(false);
-      setUploadProgress(null);
     }
+  }, [videoUri, params.opponentUid, upload, challengeMutation]);
+
+  const handleRetake = useCallback(() => {
+    reset();
+    setVideoUri(null);
+  }, [reset]);
+
+  const handleCancel = useCallback(async () => {
+    await cancel();
+    router.back();
+  }, [cancel, router]);
+
+  const handlePauseResume = useCallback(async () => {
+    if (isPaused) {
+      await resume();
+    } else {
+      await pause();
+    }
+  }, [isPaused, pause, resume]);
+
+  // Format estimated time remaining
+  const formatTimeRemaining = (seconds: number | null): string => {
+    if (seconds === null || seconds <= 0) return "";
+    if (seconds < 60) return `${seconds}s remaining`;
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}m ${remainingSeconds}s remaining`;
+  };
+
+  // Get status message for upload state
+  const getStatusMessage = (): string => {
+    if (isValidating) return "Validating video...";
+    if (isPaused) return "Upload paused";
+    if (isUploading) {
+      const timeStr = formatTimeRemaining(estimatedTimeRemaining);
+      return timeStr ? `Uploading ${progress}% - ${timeStr}` : `Uploading ${progress}%`;
+    }
+    if (status === "completed") return "Upload complete!";
+    if (status === "failed" && uploadError) return uploadError.message;
+    return "Send Challenge";
   };
 
   if (hasPermission === null) {
@@ -188,10 +206,10 @@ export default function NewChallengeScreen() {
           <Camera style={styles.camera} type={CameraType.back} ref={(ref) => setCamera(ref)}>
             <View style={styles.controls}>
               <Text
-                accessibilityLabel="Recording time limit: 15 seconds, one take only"
+                accessibilityLabel={`Recording time limit: ${VIDEO_LIMITS.MAX_DURATION_SECONDS} seconds, one take only`}
                 style={styles.timer}
               >
-                15 seconds • One-take only
+                {VIDEO_LIMITS.MAX_DURATION_SECONDS} seconds • One-take only
               </Text>
             </View>
           </Camera>
@@ -220,40 +238,97 @@ export default function NewChallengeScreen() {
             style={styles.preview}
             useNativeControls
             isLooping
-            shouldPlay
+            shouldPlay={!isUploading && !isValidating}
           />
 
+          {/* Progress bar for upload */}
+          {(isUploading || isValidating) && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBackground}>
+                <View
+                  style={[styles.progressFill, { width: `${progress}%` }]}
+                />
+              </View>
+              <Text style={styles.progressText}>{getStatusMessage()}</Text>
+            </View>
+          )}
+
+          {/* Error state with retry option */}
+          {status === "failed" && uploadError && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle" size={24} color={SKATE.colors.blood} />
+              <Text style={styles.errorText}>{uploadError.message}</Text>
+              {uploadError.isRetryable && (
+                <TouchableOpacity
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry upload"
+                  style={styles.retryButton}
+                  onPress={retry}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
           <View style={styles.actions}>
+            {/* Cancel/Retake button */}
             <TouchableOpacity
               accessible
               accessibilityRole="button"
-              accessibilityLabel="Retake video"
+              accessibilityLabel={isUploading ? "Cancel upload" : "Retake video"}
               style={styles.actionButton}
-              onPress={() => setVideoUri(null)}
+              onPress={isUploading ? handleCancel : handleRetake}
+              disabled={challengeMutation.isPending}
             >
-              <Text style={styles.actionButtonText}>Retake</Text>
+              <Text style={styles.actionButtonText}>
+                {isUploading ? "Cancel" : "Retake"}
+              </Text>
             </TouchableOpacity>
 
+            {/* Pause/Resume button (only during upload) */}
+            {isUploading && (
+              <TouchableOpacity
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={isPaused ? "Resume upload" : "Pause upload"}
+                style={[styles.actionButton, styles.pauseButton]}
+                onPress={handlePauseResume}
+              >
+                <Ionicons
+                  name={isPaused ? "play" : "pause"}
+                  size={20}
+                  color={SKATE.colors.white}
+                />
+              </TouchableOpacity>
+            )}
+
+            {/* Submit button */}
             <TouchableOpacity
               accessible
               accessibilityRole="button"
               accessibilityLabel="Send challenge to opponent"
-              accessibilityState={{ disabled: challengeMutation.isPending || uploading }}
-              style={[styles.actionButton, styles.submitButton]}
+              accessibilityState={{
+                disabled: challengeMutation.isPending || isUploading || isValidating,
+              }}
+              style={[
+                styles.actionButton,
+                styles.submitButton,
+                (isUploading || isValidating) && styles.submitButtonDisabled,
+              ]}
               onPress={submitChallenge}
-              disabled={challengeMutation.isPending || uploading}
+              disabled={challengeMutation.isPending || isUploading || isValidating}
             >
-              {uploading || challengeMutation.isPending ? (
+              {isUploading || isValidating || challengeMutation.isPending ? (
                 <View style={styles.uploadStatus}>
-                  <ActivityIndicator color={SKATE.colors.white} />
+                  <ActivityIndicator color={SKATE.colors.white} size="small" />
                   <Text style={styles.uploadText}>
-                    {uploadProgress !== null ? `Uploading ${uploadProgress}%` : "Uploading..."}
+                    {isValidating ? "Validating..." : `${progress}%`}
                   </Text>
                 </View>
               ) : (
-                <Text style={styles.actionButtonText}>
-                  {uploading ? "Uploading..." : "Send Challenge"}
-                </Text>
+                <Text style={styles.actionButtonText}>Send Challenge</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -357,5 +432,60 @@ const styles = StyleSheet.create({
     color: SKATE.colors.white,
     fontSize: 14,
     fontWeight: "600",
+  },
+  progressContainer: {
+    paddingHorizontal: SKATE.spacing.xl,
+    paddingVertical: SKATE.spacing.md,
+    backgroundColor: SKATE.colors.grime,
+  },
+  progressBackground: {
+    height: 6,
+    backgroundColor: SKATE.colors.gray,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: SKATE.colors.orange,
+    borderRadius: 3,
+  },
+  progressText: {
+    color: SKATE.colors.white,
+    fontSize: 12,
+    marginTop: SKATE.spacing.sm,
+    textAlign: "center",
+  },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 26, 26, 0.1)",
+    padding: SKATE.spacing.md,
+    marginHorizontal: SKATE.spacing.xl,
+    marginVertical: SKATE.spacing.sm,
+    borderRadius: SKATE.borderRadius.md,
+    gap: SKATE.spacing.sm,
+  },
+  errorText: {
+    flex: 1,
+    color: SKATE.colors.blood,
+    fontSize: 14,
+  },
+  retryButton: {
+    backgroundColor: SKATE.colors.blood,
+    paddingVertical: SKATE.spacing.sm,
+    paddingHorizontal: SKATE.spacing.md,
+    borderRadius: SKATE.borderRadius.sm,
+  },
+  retryButtonText: {
+    color: SKATE.colors.white,
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  pauseButton: {
+    backgroundColor: SKATE.colors.grime,
+    paddingHorizontal: SKATE.spacing.lg,
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
   },
 });
