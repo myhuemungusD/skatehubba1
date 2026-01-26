@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Link } from "wouter";
 import AppDropdownMenu from "../navigation/AppDropdownMenu";
 
 interface AppShellProps {
@@ -26,9 +27,9 @@ export default function AppShell({ children, hideNav = false }: AppShellProps) {
         {!hideNav && (
           <header className="sticky top-0 z-30 border-b border-white/10 bg-black/40 backdrop-blur">
             <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-3">
-              <div className="flex items-center gap-2 text-lg font-bold">
+              <Link href="/home" className="flex items-center gap-2 text-lg font-bold hover:text-[#ff6a00] transition-colors">
                 <span className="tracking-wide">SkateHubba</span>
-              </div>
+              </Link>
               <AppDropdownMenu />
             </div>
           </header>
