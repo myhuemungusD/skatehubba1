@@ -79,6 +79,51 @@ service firebase.storage {
                    && isValidUploadSize();
     }
 
+    // ---------- Challenge videos ----------
+    // Path: /challenges/{challengeId}/{userId}/{filename}.mp4
+    // Participants can read; only the specific user can upload their clip.
+    // Server validates and may delete invalid uploads.
+    function isValidChallengeVideoSize() {
+      // 100MB max for challenge videos
+      return request.resource.size < 100 * 1024 * 1024;
+    }
+
+    function isValidVideoType() {
+      return request.resource.contentType in [
+        'video/mp4',
+        'video/quicktime',
+        'video/x-m4v'
+      ];
+    }
+
+    match /challenges/{challengeId}/{userId}/{fileName} {
+      // Authenticated users can read (participants enforced at Firestore level)
+      allow read: if isAuthenticated();
+
+      // Only the owner can upload their video
+      allow create: if isOwner(userId)
+                    && isValidVideoType()
+                    && isValidChallengeVideoSize();
+
+      // No updates - must delete and re-upload
+      allow update: if false;
+
+      // Server can delete invalid videos; users cannot delete their own
+      // (to prevent gaming by uploading then deleting)
+      allow delete: if false;
+    }
+
+    // Draft challenge videos (before challenge is created)
+    // Path: /challenges/drafts/{userId}/{filename}.mp4
+    match /challenges/drafts/{userId}/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId)
+                   && isValidVideoType()
+                   && isValidChallengeVideoSize();
+      // Users can delete their own drafts
+      allow delete: if isOwner(userId);
+    }
+
     // ---------- Public assets ----------
     // Static public assets (no writes).
     match /public/{path=**} {

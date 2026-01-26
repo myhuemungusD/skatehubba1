@@ -981,6 +981,208 @@ export const onChallengeClipUpdate = functions.firestore
   });
 
 // ============================================================================
+// Rate Limiting Service
+// ============================================================================
+
+interface RateLimitConfig {
+  collection: string;
+  maxRequests: number;
+  windowSeconds: number;
+}
+
+const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
+  challengeCreate: {
+    collection: "challenges",
+    maxRequests: 10,
+    windowSeconds: 3600, // 10 per hour
+  },
+  videoUpload: {
+    collection: "uploads",
+    maxRequests: 20,
+    windowSeconds: 3600, // 20 per hour
+  },
+  spotCreate: {
+    collection: "spots",
+    maxRequests: 5,
+    windowSeconds: 86400, // 5 per day
+  },
+  voteCreate: {
+    collection: "votes",
+    maxRequests: 50,
+    windowSeconds: 3600, // 50 per hour
+  },
+};
+
+interface RateLimitResult {
+  allowed: boolean;
+  remaining: number;
+  resetAt: Date;
+  currentCount: number;
+}
+
+/**
+ * Check and update rate limit for a user action
+ * Uses Firestore transactions for atomic counter updates
+ */
+async function checkAndUpdateRateLimit(
+  userId: string,
+  action: keyof typeof RATE_LIMIT_CONFIGS
+): Promise<RateLimitResult> {
+  const config = RATE_LIMIT_CONFIGS[action];
+  if (!config) {
+    throw new Error(`Unknown rate limit action: ${action}`);
+  }
+
+  const db = admin.firestore();
+  const counterRef = db.doc(`rateLimits/${userId}/${config.collection}/counter`);
+
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(counterRef);
+    const now = Date.now();
+    const windowStart = now - config.windowSeconds * 1000;
+
+    let count = 0;
+    let lastReset = now;
+
+    if (doc.exists) {
+      const data = doc.data()!;
+      // Check if within current window
+      if (data.lastReset > windowStart) {
+        count = data.count;
+        lastReset = data.lastReset;
+      }
+      // else: window expired, reset counter
+    }
+
+    const resetAt = new Date(lastReset + config.windowSeconds * 1000);
+
+    if (count >= config.maxRequests) {
+      return {
+        allowed: false,
+        remaining: 0,
+        resetAt,
+        currentCount: count,
+      };
+    }
+
+    // Increment counter
+    tx.set(counterRef, {
+      count: count + 1,
+      lastReset: count === 0 ? now : lastReset,
+      updatedAt: now,
+      action,
+    });
+
+    return {
+      allowed: true,
+      remaining: config.maxRequests - count - 1,
+      resetAt,
+      currentCount: count + 1,
+    };
+  });
+}
+
+/**
+ * Get current rate limit status without incrementing
+ */
+async function getRateLimitStatus(
+  userId: string,
+  action: keyof typeof RATE_LIMIT_CONFIGS
+): Promise<RateLimitResult> {
+  const config = RATE_LIMIT_CONFIGS[action];
+  if (!config) {
+    throw new Error(`Unknown rate limit action: ${action}`);
+  }
+
+  const db = admin.firestore();
+  const counterRef = db.doc(`rateLimits/${userId}/${config.collection}/counter`);
+  const doc = await counterRef.get();
+
+  const now = Date.now();
+  const windowStart = now - config.windowSeconds * 1000;
+
+  let count = 0;
+  let lastReset = now;
+
+  if (doc.exists) {
+    const data = doc.data()!;
+    if (data.lastReset > windowStart) {
+      count = data.count;
+      lastReset = data.lastReset;
+    }
+  }
+
+  const resetAt = new Date(lastReset + config.windowSeconds * 1000);
+
+  return {
+    allowed: count < config.maxRequests,
+    remaining: Math.max(0, config.maxRequests - count),
+    resetAt,
+    currentCount: count,
+  };
+}
+
+/**
+ * Callable: Check rate limit status
+ */
+export const checkRateLimitStatus = functions.https.onCall(
+  async (
+    data: { action: string },
+    context: functions.https.CallableContext
+  ): Promise<RateLimitResult> => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Must be logged in.");
+    }
+
+    const { action } = data;
+    if (!action || !(action in RATE_LIMIT_CONFIGS)) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `Invalid action. Must be one of: ${Object.keys(RATE_LIMIT_CONFIGS).join(", ")}`
+      );
+    }
+
+    return getRateLimitStatus(
+      context.auth.uid,
+      action as keyof typeof RATE_LIMIT_CONFIGS
+    );
+  }
+);
+
+/**
+ * Scheduled: Clean up old rate limit counters
+ * Runs daily to remove expired counter documents
+ */
+export const cleanupRateLimitCounters = functions.pubsub
+  .schedule("every 24 hours")
+  .onRun(async () => {
+    const db = admin.firestore();
+    const now = Date.now();
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+    // Query all rate limit counters
+    const snapshot = await db.collectionGroup("counter").get();
+
+    const batch = db.batch();
+    let deleteCount = 0;
+
+    snapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      if (data.updatedAt && now - data.updatedAt > maxAge) {
+        batch.delete(doc.ref);
+        deleteCount++;
+      }
+    });
+
+    if (deleteCount > 0) {
+      await batch.commit();
+      console.log(`[cleanupRateLimitCounters] Deleted ${deleteCount} stale counters`);
+    }
+
+    return null;
+  });
+
+// ============================================================================
 // Push Notifications (FCM)
 // ============================================================================
 

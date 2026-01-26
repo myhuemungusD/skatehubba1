@@ -404,15 +404,39 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // REMOTE S.K.A.T.E. CHALLENGES
+    // REMOTE S.K.A.T.E. CHALLENGES (Enhanced for Mobile)
     // =========================================================================
 
-    match /challenges/{challengeId} {
-      allow read: if isAuthenticated()
-        && (resource.data.createdBy == request.auth.uid
-            || resource.data.opponent == request.auth.uid
-            || request.auth.uid in resource.data.participants);
+    // Valid challenge statuses for state machine
+    function isValidChallengeStatus(status) {
+      return status in [
+        'created',
+        'creator_ready',
+        'opponent_uploading',
+        'both_ready',
+        'voting',
+        'completed',
+        'expired',
+        'cancelled'
+      ];
+    }
 
+    // Check if user is a challenge participant
+    function isChallengeParticipant(challengeData) {
+      return isAuthenticated()
+        && (challengeData.createdBy == request.auth.uid
+            || challengeData.opponent == request.auth.uid
+            || request.auth.uid in challengeData.participants);
+    }
+
+    match /challenges/{challengeId} {
+      // Read: Only participants can read their challenges
+      allow read: if isAuthenticated()
+        && isChallengeParticipant(resource.data);
+
+      // Create: Creator initiates challenge
+      // Note: Challenge creation should go through Cloud Function for full validation
+      // This rule allows client-side creation with basic validation as fallback
       allow create: if isAuthenticated()
         && hasRequiredFields(['createdBy', 'opponent', 'participants', 'rules', 'status', 'createdAt'])
         && request.resource.data.createdBy == request.auth.uid
@@ -420,47 +444,134 @@ service cloud.firestore {
         && request.resource.data.participants.size() == 2
         && request.auth.uid in request.resource.data.participants
         && request.resource.data.opponent in request.resource.data.participants
-
         && request.resource.data.rules.oneTake == true
-        && request.resource.data.rules.durationSec == 15
+        && request.resource.data.rules.maxDuration == 15
+        && isValidChallengeStatus(request.resource.data.status)
+        && isRecentTimestamp('createdAt')
+        // Rate limiting check (optional - enforced by Cloud Function)
+        && !exists(/databases/$(db)/documents/rateLimits/$(request.auth.uid)/challenges/counter)
+           || get(/databases/$(db)/documents/rateLimits/$(request.auth.uid)/challenges/counter).data.count < 10;
 
-        && request.resource.data.clipA.createdBy == request.auth.uid
-        && request.resource.data.clipA.durationSec >= 14.5
-        && request.resource.data.clipA.durationSec <= 15.5
-        && request.resource.data.clipA.url is string
-        && request.resource.data.clipA.url.size() >= 1
-        && request.resource.data.clipA.url.size() <= 2000
-
-        && request.resource.data.status == 'pending'
-        && isRecentTimestamp('createdAt');
-
+      // Update: Limited to specific state transitions by participants
       allow update: if isAuthenticated()
-        && (
-          (resource.data.opponent == request.auth.uid
-           && resource.data.status == 'pending'
-           && request.resource.data.status == 'active'
-           && 'clipB' in request.resource.data
-           && request.resource.data.clipB.createdBy == request.auth.uid
-           && request.resource.data.clipB.durationSec >= 14.5
-           && request.resource.data.clipB.durationSec <= 15.5
-           && request.resource.data.clipB.url is string
-           && request.resource.data.clipB.url.size() >= 1
-           && request.resource.data.clipB.url.size() <= 2000)
-          ||
-          (resource.data.createdBy == request.auth.uid
-           && resource.data.status == 'pending'
-           && request.resource.data.status == 'cancelled')
-        )
+        && isChallengeParticipant(resource.data)
+        // Immutable fields
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.opponent == resource.data.opponent
         && request.resource.data.participants == resource.data.participants
         && request.resource.data.rules == resource.data.rules
         && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.clipA == resource.data.clipA;
+        // Valid state transition
+        && isValidChallengeStatus(request.resource.data.status)
+        && (
+          // Creator can cancel pending challenge
+          (resource.data.createdBy == request.auth.uid
+           && resource.data.status in ['created', 'creator_ready']
+           && request.resource.data.status == 'cancelled')
+          ||
+          // Opponent can upload their clip (via Cloud Function, but allow status read)
+          (resource.data.opponent == request.auth.uid
+           && resource.data.status == 'creator_ready'
+           && request.resource.data.status in ['opponent_uploading', 'both_ready'])
+          ||
+          // Allow updatedAt changes only
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['updatedAt']))
+        );
 
+      // Delete: Only creator can delete pending challenges
       allow delete: if isAuthenticated()
         && resource.data.createdBy == request.auth.uid
-        && resource.data.status == 'pending';
+        && resource.data.status in ['created', 'creator_ready', 'cancelled'];
+
+      // Subcollection: Challenge clips metadata
+      match /clips/{clipId} {
+        allow read: if isAuthenticated()
+          && isChallengeParticipant(get(/databases/$(db)/documents/challenges/$(challengeId)).data);
+        // Writes handled by Cloud Function
+        allow write: if false;
+      }
+
+      // Subcollection: Challenge votes
+      match /votes/{oderId} {
+        allow read: if isAuthenticated();
+
+        // Users can vote once (document ID = user ID)
+        allow create: if isAuthenticated()
+          && oderId == request.auth.uid
+          // Can't vote on own challenge
+          && !isChallengeParticipant(get(/databases/$(db)/documents/challenges/$(challengeId)).data)
+          // Challenge must be in voting state
+          && get(/databases/$(db)/documents/challenges/$(challengeId)).data.status == 'voting'
+          // Required fields
+          && hasRequiredFields(['oderId', 'votedFor', 'createdAt'])
+          && request.resource.data.oderId == request.auth.uid
+          && isRecentTimestamp('createdAt');
+
+        allow update, delete: if false;
+      }
+    }
+
+    // =========================================================================
+    // RATE LIMITING COUNTERS (Server-managed)
+    // =========================================================================
+
+    match /rateLimits/{userId}/{collection}/{document} {
+      // Users can read their own rate limit status
+      allow read: if isOwner(userId);
+      // Only server can write
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // PROCESSED VIDEOS (Idempotency - Server-managed)
+    // =========================================================================
+
+    match /processed_videos/{idempotencyKey} {
+      // Read allowed for debugging
+      allow read: if isAuthenticated();
+      // Only server can write
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // AUDIT LOGS (Server-managed)
+    // =========================================================================
+
+    match /audit_logs/{logId} {
+      // Admin-only read
+      allow read: if isAuthenticated()
+        && request.auth.token.roles is list
+        && 'admin' in request.auth.token.roles;
+      // Only server can write
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // FCM TOKENS (User-owned subcollection)
+    // =========================================================================
+
+    match /users/{userId}/fcmTokens/{tokenId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // =========================================================================
+    // ACTIVITY FEED
+    // =========================================================================
+
+    match /activity/{activityId} {
+      allow read: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+
+      // Mark as read
+      allow update: if isOwner(resource.data.userId)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.type == resource.data.type
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+
+      // Only server can create
+      allow create: if false;
+      allow delete: if isOwner(resource.data.userId);
     }
 
     // =========================================================================
