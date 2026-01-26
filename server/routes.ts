@@ -31,6 +31,7 @@ import { moderationRouter } from "./routes/moderation";
 import { createPost } from "./services/moderationStore";
 import { sendQuickMatchNotification } from "./services/notificationService";
 import { profileRouter } from "./routes/profile";
+import { gamesRouter } from "./routes/games";
 import logger from "./logger";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -48,6 +49,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 3c. Profile Routes
   app.use("/api/profile", profileRouter);
+
+  // 3d. Game Routes
+  app.use("/api/games", gamesRouter);
 
   // 4. Spot Endpoints
   app.get("/api/spots", async (_req, res) => {

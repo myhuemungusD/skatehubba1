@@ -534,49 +534,73 @@ export const insertSpotSchema = createInsertSchema(spots, {
   createdBy: true,
 });
 
-// S.K.A.T.E. Games table
-export const games = pgTable("games", {
-  id: varchar("id")
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  player1Id: varchar("player1_id", { length: 255 }).notNull(),
-  player1Name: varchar("player1_name", { length: 255 }).notNull(),
-  player2Id: varchar("player2_id", { length: 255 }),
-  player2Name: varchar("player2_name", { length: 255 }),
-  status: varchar("status", { length: 50 }).notNull().default("waiting"), // 'waiting', 'active', 'completed'
-  currentTurn: varchar("current_turn", { length: 255 }),
-  player1Letters: varchar("player1_letters", { length: 5 }).default(""),
-  player2Letters: varchar("player2_letters", { length: 5 }).default(""),
-  winnerId: varchar("winner_id", { length: 255 }),
-  lastTrickDescription: text("last_trick_description"),
-  lastTrickBy: varchar("last_trick_by", { length: 255 }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-  completedAt: timestamp("completed_at"),
-});
+// Remote S.K.A.T.E. Games table
+export const games = pgTable(
+  "games",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    challengerId: varchar("challenger_id", { length: 128 }).notNull(),
+    opponentId: varchar("opponent_id", { length: 128 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("pending"), // pending, active, completed, forfeited
+    currentTurnUid: varchar("current_turn_uid", { length: 128 }),
+    challengerLetters: varchar("challenger_letters", { length: 5 }).default(""),
+    opponentLetters: varchar("opponent_letters", { length: 5 }).default(""),
+    winnerId: varchar("winner_id", { length: 128 }),
+    forfeitReason: varchar("forfeit_reason", { length: 50 }),
+    currentTurnDeadline: timestamp("current_turn_deadline"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => ({
+    challengerIdx: index("games_challenger_idx").on(table.challengerId),
+    opponentIdx: index("games_opponent_idx").on(table.opponentId),
+    statusIdx: index("games_status_idx").on(table.status),
+    deadlineIdx: index("games_deadline_idx").on(table.currentTurnDeadline),
+  })
+);
 
 // Game turns/history table
-export const gameTurns = pgTable("game_turns", {
-  id: serial("id").primaryKey(),
-  gameId: varchar("game_id", { length: 255 }).notNull(),
-  playerId: varchar("player_id", { length: 255 }).notNull(),
-  playerName: varchar("player_name", { length: 255 }).notNull(),
-  turnNumber: integer("turn_number").notNull(),
-  trickDescription: text("trick_description").notNull(),
-  result: varchar("result", { length: 50 }).notNull(), // 'landed', 'missed', 'challenged'
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+export const gameTurns = pgTable(
+  "game_turns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    uid: varchar("uid", { length: 128 }).notNull(),
+    turnNumber: integer("turn_number").notNull(),
+    turnType: varchar("turn_type", { length: 10 }).notNull(), // set | match
+    videoUrl: text("video_url").notNull(),
+    thumbnailUrl: text("thumbnail_url"),
+    trickDescription: text("trick_description"),
+    judgment: varchar("judgment", { length: 20 }), // null, made, missed
+    judgedAt: timestamp("judged_at"),
+    judgedBy: varchar("judged_by", { length: 128 }),
+    deadline: timestamp("deadline").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    gameIdx: index("game_turns_game_idx").on(table.gameId),
+    uidIdx: index("game_turns_uid_idx").on(table.uid),
+    deadlineIdx: index("game_turns_deadline_idx").on(table.deadline),
+    uniqueTurn: uniqueIndex("game_turns_unique_number_idx").on(table.gameId, table.turnNumber),
+  })
+);
 
 export const insertGameSchema = createInsertSchema(games).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
   completedAt: true,
+  currentTurnDeadline: true,
 });
 
 export const insertGameTurnSchema = createInsertSchema(gameTurns).omit({
   id: true,
   createdAt: true,
+  judgedAt: true,
+  judgedBy: true,
 });
 
 // Auth validation schemas
