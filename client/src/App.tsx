@@ -105,7 +105,7 @@ const BoltsShowcase = lazy(() => import("./features/social/bolts-showcase/BoltsS
  * - Root (/) redirects unauthenticated users to /landing
  * - Root (/) redirects authenticated users to /home
  * - Landing page: minimal, conversion-focused ("Get Started" CTA -> /signin)
- * - Sign in/Sign up: checks for profile, redirects to /profile-setup if missing
+ * - Sign in/Sign up: checks for profile, redirects to /profile/setup if missing
  * - Profile setup: redirects to /home after completion
  * - Home page: member hub with quick actions (Feed/Map/Battle/Profile)
  * - Legacy routes (/old, /new) removed - zero duplication architecture
@@ -356,7 +356,6 @@ function AppRoutes() {
         <Route path="/game" component={AppShellChallengeLobbyRoute} />
         <Route path="/signup" component={SignupPage} />
         <Route path="/signin" component={SigninPage} />
-        <Route path="/profile-setup" component={ProfileSetupRoute} />
         <Route path="/verify" component={VerifyPage} />
         <Route path="/auth/verify" component={AuthVerifyPage} />
         <Route path="/verify-email" component={VerifyEmailPage} />
@@ -373,8 +372,8 @@ function AppRoutes() {
         <ProtectedRoute path="/dashboard" component={AppShellFeedRoute} />
         <ProtectedRoute path="/feed" component={AppShellFeedRoute} />
         <ProtectedRoute path="/map" component={AppShellMapRoute} allowMissingProfile />
-        <ProtectedRoute path="/spots/:id" component={AppShellSpotDetailRoute} />
-        <ProtectedRoute path="/skate-game" component={AppShellSkateGameRoute} />
+        <ProtectedRoute path="/spots/:id" component={AppShellSpotDetailRoute} allowMissingProfile />
+        <ProtectedRoute path="/skate-game" component={AppShellSkateGameRoute} allowMissingProfile />
         <ProtectedRoute
           path="/leaderboard"
           component={AppShellLeaderboardRoute}
