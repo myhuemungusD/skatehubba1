@@ -107,6 +107,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       type InsertSpot = z.infer<typeof insertSpotSchema>;
       const spotPayload = req.body as InsertSpot;
 
+      // Check for duplicate spots (same name + similar coords)
+      const isDuplicate = await spotStorage.checkDuplicate(
+        spotPayload.name,
+        spotPayload.lat,
+        spotPayload.lng
+      );
+
+      if (isDuplicate) {
+        logAuditEvent({
+          action: "spot.rejected.duplicate",
+          userId: req.currentUser!.id,
+          ip: getClientIp(req),
+          metadata: {
+            name: spotPayload.name,
+            lat: spotPayload.lat,
+            lng: spotPayload.lng,
+          },
+        });
+        return res.status(409).json({
+          error: "A spot with this name already exists at this location.",
+        });
+      }
+
       // Creation: Pass 'createdBy' from the authenticated session
       const spot = await spotStorage.createSpot({
         ...spotPayload,
