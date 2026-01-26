@@ -324,6 +324,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Handle Roles Result
         if (rolesRes.status === "fulfilled" && rolesRes.value.status === "ok") {
           set({ roles: rolesRes.value.data, error: null });
+        } else {
+          // If roles fetch failed, set error and mark as degraded
+          let rolesError = "Failed to fetch roles";
+          if (rolesRes.status === "fulfilled" && rolesRes.value.status !== "ok") {
+            rolesError = rolesRes.value.error;
+          } else if (rolesRes.status === "rejected") {
+            rolesError =
+              rolesRes.reason instanceof Error ? rolesRes.reason.message : String(rolesRes.reason);
+          }
+          set({ error: new Error(rolesError) });
+          finalStatus = "degraded";
         }
       } else {
         set({
@@ -333,6 +344,51 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           roles: [],
         });
       }
+
+      // PHASE 3: Persistent Auth Listener
+      // Subscribe to auth state changes to handle external logout/session expiration
+      onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          // User signed in or session valid
+          set({ user, loading: false });
+
+          // Fetch profile and roles if not already set
+          const currentState = get();
+          if (!currentState.profile || currentState.profileStatus === "unknown") {
+            const [profileResult, rolesResult] = await Promise.all([
+              withTimeout(fetchProfile(user.uid), 4000, "fetchProfile"),
+              withTimeout(extractRolesFromToken(user), 4000, "fetchRoles"),
+            ]);
+
+            if (profileResult.status === "ok" && profileResult.data) {
+              set({ profile: profileResult.data, profileStatus: "exists" });
+              writeProfileCache(user.uid, { status: "exists", profile: profileResult.data });
+            } else {
+              const cached = readProfileCache(user.uid);
+              if (cached) {
+                set({ profile: cached.profile, profileStatus: cached.status });
+              }
+            }
+
+            if (rolesResult.status === "ok") {
+              set({ roles: rolesResult.data });
+            }
+          }
+        } else {
+          // User signed out or session expired
+          const currentUid = get().user?.uid;
+          set({
+            user: null,
+            profile: null,
+            profileStatus: "unknown",
+            roles: [],
+            loading: false,
+          });
+          if (currentUid) {
+            clearProfileCache(currentUid);
+          }
+        }
+      });
     } catch (fatal) {
       console.error("[AuthStore] Critical boot failure:", fatal);
       finalStatus = "degraded";
