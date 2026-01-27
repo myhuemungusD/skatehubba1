@@ -294,6 +294,7 @@ function AppRoutes() {
         <Route path="/login" component={LoginPage} />
         <Route path="/signup" component={SignupPage} />
         <Route path="/signin" component={SigninPage} />
+        <Route path="/forgot-password" component={ForgotPasswordPage} />
         <Route path="/verify" component={VerifyPage} />
         <Route path="/auth/verify" component={AuthVerifyPage} />
         <Route path="/verify-email" component={VerifyEmailPage} />
