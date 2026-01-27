@@ -535,7 +535,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = req.headers.authorization;
 
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Authorization is required - check against CRON_SECRET
+    // If CRON_SECRET is not set, this will reject all requests (as authHeader won't match undefined)
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
