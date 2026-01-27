@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Home, Activity, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
-// Import existing page content as sections
-import HomeContent from "./home";
-import FeedContent from "./feed";
-import ClosetContent from "./closet";
-import BoltsShowcaseContent from "@/features/social/bolts-showcase/BoltsShowcase";
+// Lazy load tab content for better performance
+const HomeContent = lazy(() => import("./home"));
+const FeedContent = lazy(() => import("./feed"));
+const ClosetContent = lazy(() => import("./closet"));
+const BoltsShowcaseContent = lazy(() => import("@/features/social/bolts-showcase/BoltsShowcase"));
 
 type HubTab = "overview" | "activity" | "profile" | "community";
 
@@ -65,31 +66,33 @@ export default function HubPage() {
       </nav>
 
       {/* Tab Content */}
-      <div className="min-h-[60vh]">
-        {activeTab === "overview" && (
-          <section aria-label="Hub Overview">
-            <HomeContent />
-          </section>
-        )}
+      <Suspense fallback={<LoadingScreen />}>
+        <div className="min-h-[60vh]">
+          {activeTab === "overview" && (
+            <section aria-label="Hub Overview">
+              <HomeContent />
+            </section>
+          )}
 
-        {activeTab === "activity" && (
-          <section aria-label="Live Activity Feed">
-            <FeedContent />
-          </section>
-        )}
+          {activeTab === "activity" && (
+            <section aria-label="Live Activity Feed">
+              <FeedContent />
+            </section>
+          )}
 
-        {activeTab === "profile" && (
-          <section aria-label="Your Profile">
-            <ClosetContent />
-          </section>
-        )}
+          {activeTab === "profile" && (
+            <section aria-label="Your Profile">
+              <ClosetContent />
+            </section>
+          )}
 
-        {activeTab === "community" && (
-          <section aria-label="Community Showcase">
-            <BoltsShowcaseContent />
-          </section>
-        )}
-      </div>
+          {activeTab === "community" && (
+            <section aria-label="Community Showcase">
+              <BoltsShowcaseContent />
+            </section>
+          )}
+        </div>
+      </Suspense>
     </div>
   );
 }
