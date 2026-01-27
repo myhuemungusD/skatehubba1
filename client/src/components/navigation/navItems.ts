@@ -11,21 +11,16 @@ export function useNavItems(): NavItem[] {
   return useMemo(() => {
     if (GUEST_MODE) {
       return [
-        { label: "HOME", href: "/home" },
-        { label: "S.K.A.T.E", href: "/skate-game" },
         { label: "SPOTMAP", href: "/map" },
-        { label: "HUBBA SHOP", href: "/shop" },
-        { label: "THE TRENCHES", href: "/leaderboard" },
+        { label: "S.K.A.T.E", href: "/play" },
       ];
     }
     return [
-      { label: "PROFILE", href: "/closet" },
-      { label: "S.K.A.T.E", href: "/game" },
+      { label: "HUB", href: "/hub" },
+      { label: "S.K.A.T.E", href: "/play" },
       { label: "SPOTMAP", href: "/map" },
       { label: "HUBBA SHOP", href: "/shop" },
-      { label: "THE TRENCHES", href: "/leaderboard" },
-      { label: "SETTINGS", href: "/settings" },
-      { label: "TRICK MINTING", disabled: true },
+      { label: "MY PROFILE", href: "/me" },
     ];
   }, []);
 }
