@@ -5,6 +5,7 @@ import { View, StyleSheet } from 'react-native';
 export default function TabLayout() {
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: '#ff6600',
         tabBarInactiveTintColor: '#666',
@@ -24,7 +25,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'SkateHubba',
-          tabBarLabel: 'Home',
+          tabBarLabel: 'Hub',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
