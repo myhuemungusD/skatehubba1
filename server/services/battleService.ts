@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { logServerEvent } from "./analyticsService";
 import logger from "../logger";
-import { battles, battleVotes } from "../../shared/schema";
+import { battles, battleVotes } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 /**

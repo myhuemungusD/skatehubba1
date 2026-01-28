@@ -6,10 +6,10 @@ import {
   type AnalyticsBatch,
   type AnalyticsIngest,
   validateEventProps,
-} from "../../shared/analytics-events";
+} from "@shared/analytics-events";
 import { requireFirebaseUid, type FirebaseAuthedRequest } from "../middleware/firebaseUid";
 import { db } from "../db";
-import { analyticsEvents } from "../../shared/schema-analytics";
+import { analyticsEvents } from "@shared/schema-analytics";
 import logger from "../logger";
 import { validateBody } from "../middleware/validation";
 
