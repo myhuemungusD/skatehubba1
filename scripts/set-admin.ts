@@ -20,7 +20,7 @@ import * as path from "path";
 import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import { eq } from "drizzle-orm";
-import { users } from "../shared/schema";
+import { users } from "../packages/shared/schema";
 
 const { Pool } = pg;
 

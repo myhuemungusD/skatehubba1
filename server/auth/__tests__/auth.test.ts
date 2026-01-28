@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { insertUserSchema, loginSchema, registerSchema } from "../../../shared/schema";
+import { insertUserSchema, loginSchema, registerSchema } from "@shared/schema";
 
 describe("auth schema validation", () => {
   describe("signup validation", () => {
